@@ -1,5 +1,18 @@
 import { inGPUMode } from '../gpuMode';
-import type { SelfResolvable } from '../types';
+import {
+  Vec2fImpl,
+  Vec2hImpl,
+  Vec2iImpl,
+  Vec2uImpl,
+  Vec3fImpl,
+  Vec3hImpl,
+  Vec3iImpl,
+  Vec3uImpl,
+  Vec4fImpl,
+  Vec4hImpl,
+  Vec4iImpl,
+  Vec4uImpl,
+} from './vector-no-proxy';
 import type {
   Vec2f,
   Vec2h,
@@ -27,6 +40,8 @@ import type {
   v4u,
 } from './wgslTypes';
 
+export type { VecKind } from './vector-no-proxy';
+
 // --------------
 // Implementation
 // --------------
@@ -35,7 +50,6 @@ interface VecSchemaOptions<TType extends string, TValue> {
   type: TType;
   length: number;
   make: (...args: number[]) => TValue;
-  makeFromScalar: (value: number) => TValue;
 }
 
 type VecSchemaBase<TValue> = {
@@ -59,11 +73,7 @@ function makeVecSchema<TType extends string, TValue>(
       return `${VecSchema.type}(${values.join(', ')})` as unknown as TValue;
     }
 
-    if (values.length <= 1) {
-      return options.makeFromScalar(values[0] ?? 0);
-    }
-
-    if (values.length === options.length) {
+    if (values.length <= 1 || values.length === options.length) {
       return options.make(...values);
     }
 
@@ -75,433 +85,9 @@ function makeVecSchema<TType extends string, TValue>(
   return Object.assign(construct, VecSchema);
 }
 
-abstract class vec2Impl implements SelfResolvable {
-  public readonly length = 2;
-  abstract readonly kind: `vec2${'f' | 'u' | 'i' | 'h'}`;
-
-  [n: number]: number;
-
-  constructor(
-    public x: number,
-    public y: number,
-  ) {}
-
-  *[Symbol.iterator]() {
-    yield this.x;
-    yield this.y;
-  }
-
-  get [0]() {
-    return this.x;
-  }
-
-  get [1]() {
-    return this.y;
-  }
-
-  set [0](value: number) {
-    this.x = value;
-  }
-
-  set [1](value: number) {
-    this.y = value;
-  }
-
-  '~resolve'(): string {
-    return `${this.kind}(${this.x}, ${this.y})`;
-  }
-
-  toString() {
-    return this['~resolve']();
-  }
-}
-
-class vec2fImpl extends vec2Impl {
-  readonly kind = 'vec2f';
-
-  make2(x: number, y: number): v2f {
-    return new vec2fImpl(x, y) as unknown as v2f;
-  }
-
-  make3(x: number, y: number, z: number): v3f {
-    return new vec3fImpl(x, y, z) as unknown as v3f;
-  }
-
-  make4(x: number, y: number, z: number, w: number): v4f {
-    return new vec4fImpl(x, y, z, w) as unknown as v4f;
-  }
-}
-
-class vec2hImpl extends vec2Impl {
-  readonly kind = 'vec2h';
-
-  make2(x: number, y: number): v2h {
-    return new vec2hImpl(x, y) as unknown as v2h;
-  }
-
-  make3(x: number, y: number, z: number): v3h {
-    return new vec3hImpl(x, y, z) as unknown as v3h;
-  }
-
-  make4(x: number, y: number, z: number, w: number): v4h {
-    return new vec4hImpl(x, y, z, w) as unknown as v4h;
-  }
-}
-
-class vec2iImpl extends vec2Impl {
-  readonly kind = 'vec2i';
-
-  make2(x: number, y: number): v2i {
-    return new vec2iImpl(x, y) as unknown as v2i;
-  }
-
-  make3(x: number, y: number, z: number): v3i {
-    return new vec3iImpl(x, y, z) as unknown as v3i;
-  }
-
-  make4(x: number, y: number, z: number, w: number): v4i {
-    return new vec4iImpl(x, y, z, w) as unknown as v4i;
-  }
-}
-
-class vec2uImpl extends vec2Impl {
-  readonly kind = 'vec2u';
-
-  make2(x: number, y: number): v2u {
-    return new vec2uImpl(x, y) as unknown as v2u;
-  }
-
-  make3(x: number, y: number, z: number): v3u {
-    return new vec3uImpl(x, y, z) as unknown as v3u;
-  }
-
-  make4(x: number, y: number, z: number, w: number): v4u {
-    return new vec4uImpl(x, y, z, w) as unknown as v4u;
-  }
-}
-
-abstract class vec3Impl implements SelfResolvable {
-  public readonly length = 3;
-  abstract readonly kind: `vec3${'f' | 'u' | 'i' | 'h'}`;
-  [n: number]: number;
-
-  constructor(
-    public x: number,
-    public y: number,
-    public z: number,
-  ) {}
-
-  *[Symbol.iterator]() {
-    yield this.x;
-    yield this.y;
-    yield this.z;
-  }
-
-  get [0]() {
-    return this.x;
-  }
-
-  get [1]() {
-    return this.y;
-  }
-
-  get [2]() {
-    return this.z;
-  }
-
-  set [0](value: number) {
-    this.x = value;
-  }
-
-  set [1](value: number) {
-    this.y = value;
-  }
-
-  set [2](value: number) {
-    this.z = value;
-  }
-
-  '~resolve'(): string {
-    return `${this.kind}(${this.x}, ${this.y}, ${this.z})`;
-  }
-
-  toString() {
-    return this['~resolve']();
-  }
-}
-
-class vec3fImpl extends vec3Impl {
-  readonly kind = 'vec3f';
-
-  make2(x: number, y: number): v2f {
-    return new vec2fImpl(x, y) as unknown as v2f;
-  }
-
-  make3(x: number, y: number, z: number): v3f {
-    return new vec3fImpl(x, y, z) as unknown as v3f;
-  }
-
-  make4(x: number, y: number, z: number, w: number): v4f {
-    return new vec4fImpl(x, y, z, w) as unknown as v4f;
-  }
-}
-
-class vec3hImpl extends vec3Impl {
-  readonly kind = 'vec3h';
-
-  make2(x: number, y: number): v2h {
-    return new vec2hImpl(x, y) as unknown as v2h;
-  }
-
-  make3(x: number, y: number, z: number): v3h {
-    return new vec3hImpl(x, y, z) as unknown as v3h;
-  }
-
-  make4(x: number, y: number, z: number, w: number): v4h {
-    return new vec4hImpl(x, y, z, w) as unknown as v4h;
-  }
-}
-
-class vec3iImpl extends vec3Impl {
-  readonly kind = 'vec3i';
-
-  make2(x: number, y: number): v2i {
-    return new vec2iImpl(x, y) as unknown as v2i;
-  }
-
-  make3(x: number, y: number, z: number): v3i {
-    return new vec3iImpl(x, y, z) as unknown as v3i;
-  }
-
-  make4(x: number, y: number, z: number, w: number): v4i {
-    return new vec4iImpl(x, y, z, w) as unknown as v4i;
-  }
-}
-
-class vec3uImpl extends vec3Impl {
-  readonly kind = 'vec3u';
-
-  make2(x: number, y: number): v2u {
-    return new vec2uImpl(x, y) as unknown as v2u;
-  }
-
-  make3(x: number, y: number, z: number): v3u {
-    return new vec3uImpl(x, y, z) as unknown as v3u;
-  }
-
-  make4(x: number, y: number, z: number, w: number): v4u {
-    return new vec4uImpl(x, y, z, w) as unknown as v4u;
-  }
-}
-
-abstract class vec4Impl implements SelfResolvable {
-  public readonly length = 4;
-  abstract readonly kind: `vec4${'f' | 'u' | 'i' | 'h'}`;
-  [n: number]: number;
-
-  constructor(
-    public x: number,
-    public y: number,
-    public z: number,
-    public w: number,
-  ) {}
-
-  *[Symbol.iterator]() {
-    yield this.x;
-    yield this.y;
-    yield this.z;
-    yield this.w;
-  }
-
-  get [0]() {
-    return this.x;
-  }
-
-  get [1]() {
-    return this.y;
-  }
-
-  get [2]() {
-    return this.z;
-  }
-
-  get [3]() {
-    return this.w;
-  }
-
-  set [0](value: number) {
-    this.x = value;
-  }
-
-  set [1](value: number) {
-    this.y = value;
-  }
-
-  set [2](value: number) {
-    this.z = value;
-  }
-
-  set [3](value: number) {
-    this.w = value;
-  }
-
-  '~resolve'(): string {
-    return `${this.kind}(${this.x}, ${this.y}, ${this.z}, ${this.w})`;
-  }
-
-  toString() {
-    return this['~resolve']();
-  }
-}
-
-class vec4fImpl extends vec4Impl {
-  readonly kind = 'vec4f';
-
-  make2(x: number, y: number): v2f {
-    return new vec2fImpl(x, y) as unknown as v2f;
-  }
-
-  make3(x: number, y: number, z: number): v3f {
-    return new vec3fImpl(x, y, z) as unknown as v3f;
-  }
-
-  make4(x: number, y: number, z: number, w: number): v4f {
-    return new vec4fImpl(x, y, z, w) as unknown as v4f;
-  }
-}
-
-class vec4hImpl extends vec4Impl {
-  readonly kind = 'vec4h';
-
-  make2(x: number, y: number): v2h {
-    return new vec2hImpl(x, y) as unknown as v2h;
-  }
-
-  make3(x: number, y: number, z: number): v3h {
-    return new vec3hImpl(x, y, z) as unknown as v3h;
-  }
-
-  make4(x: number, y: number, z: number, w: number): v4h {
-    return new vec4hImpl(x, y, z, w) as unknown as v4h;
-  }
-}
-
-class vec4iImpl extends vec4Impl {
-  readonly kind = 'vec4i';
-
-  make2(x: number, y: number): v2i {
-    return new vec2iImpl(x, y) as unknown as v2i;
-  }
-
-  make3(x: number, y: number, z: number): v3i {
-    return new vec3iImpl(x, y, z) as unknown as v3i;
-  }
-
-  make4(x: number, y: number, z: number, w: number): v4i {
-    return new vec4iImpl(x, y, z, w) as unknown as v4i;
-  }
-}
-
-class vec4uImpl extends vec4Impl {
-  readonly kind = 'vec4u';
-
-  make2(x: number, y: number): v2u {
-    return new vec2uImpl(x, y) as unknown as v2u;
-  }
-
-  make3(x: number, y: number, z: number): v3u {
-    return new vec3uImpl(x, y, z) as unknown as v3u;
-  }
-
-  make4(x: number, y: number, z: number, w: number): v4u {
-    return new vec4uImpl(x, y, z, w) as unknown as v4u;
-  }
-}
-
-const vecProxyHandler: ProxyHandler<{ kind: VecKind }> = {
-  get: (target, prop) => {
-    if (typeof prop === 'symbol' || !Number.isNaN(Number.parseInt(prop))) {
-      return Reflect.get(target, prop);
-    }
-
-    const targetAsVec4 = target as unknown as vec4uImpl;
-    const values = new Array(prop.length) as number[];
-
-    let idx = 0;
-    for (const char of prop as string) {
-      switch (char) {
-        case 'x':
-          values[idx] = targetAsVec4.x;
-          break;
-        case 'y':
-          values[idx] = targetAsVec4.y;
-          break;
-        case 'z':
-          values[idx] = targetAsVec4.z;
-          break;
-        case 'w':
-          values[idx] = targetAsVec4.w;
-          break;
-        default:
-          return Reflect.get(targetAsVec4, prop);
-      }
-      idx++;
-    }
-
-    if (prop.length === 4) {
-      return new Proxy(
-        targetAsVec4.make4(
-          values[0] as number,
-          values[1] as number,
-          values[2] as number,
-          values[3] as number,
-        ),
-        vecProxyHandler,
-      );
-    }
-
-    if (prop.length === 3) {
-      return new Proxy(
-        targetAsVec4.make3(
-          values[0] as number,
-          values[1] as number,
-          values[2] as number,
-        ),
-        vecProxyHandler,
-      );
-    }
-
-    if (prop.length === 2) {
-      return new Proxy(
-        targetAsVec4.make2(values[0] as number, values[1] as number),
-        vecProxyHandler,
-      );
-    }
-
-    return Reflect.get(target, prop);
-  },
-};
-
 // ----------
 // Public API
 // ----------
-
-/**
- * Type encompassing all available kinds of vector.
- */
-export type VecKind =
-  | 'vec2f'
-  | 'vec2i'
-  | 'vec2u'
-  | 'vec2h'
-  | 'vec3f'
-  | 'vec3i'
-  | 'vec3u'
-  | 'vec3h'
-  | 'vec4f'
-  | 'vec4i'
-  | 'vec4u'
-  | 'vec4h';
 
 /**
  * Type of the `d.vec2f` object/function: vector data type schema/constructor
@@ -529,9 +115,7 @@ export type NativeVec2f = Vec2f & { '~exotic': Vec2f } & ((
 export const vec2f = makeVecSchema({
   type: 'vec2f',
   length: 2,
-  make: (x: number, y: number) =>
-    new Proxy(new vec2fImpl(x, y), vecProxyHandler) as v2f,
-  makeFromScalar: (x) => new Proxy(new vec2fImpl(x, x), vecProxyHandler) as v2f,
+  make: (x, y) => new Vec2fImpl(x, y) as unknown as v2f,
 }) as NativeVec2f;
 
 /**
@@ -560,9 +144,7 @@ export type NativeVec2h = Vec2h & { '~exotic': Vec2h } & ((
 export const vec2h = makeVecSchema({
   type: 'vec2h',
   length: 2,
-  make: (x: number, y: number) =>
-    new Proxy(new vec2hImpl(x, y), vecProxyHandler) as v2h,
-  makeFromScalar: (x) => new Proxy(new vec2hImpl(x, x), vecProxyHandler) as v2h,
+  make: (x, y) => new Vec2hImpl(x, y) as unknown as v2h,
 }) as NativeVec2h;
 
 /**
@@ -591,9 +173,7 @@ export type NativeVec2i = Vec2i & { '~exotic': Vec2i } & ((
 export const vec2i = makeVecSchema({
   type: 'vec2i',
   length: 2,
-  make: (x: number, y: number) =>
-    new Proxy(new vec2iImpl(x, y), vecProxyHandler) as v2i,
-  makeFromScalar: (x) => new Proxy(new vec2iImpl(x, x), vecProxyHandler) as v2i,
+  make: (x, y) => new Vec2iImpl(x, y) as unknown as v2i,
 }) as NativeVec2i;
 
 /**
@@ -622,9 +202,7 @@ export type NativeVec2u = Vec2u & { '~exotic': Vec2u } & ((
 export const vec2u = makeVecSchema({
   type: 'vec2u',
   length: 2,
-  make: (x: number, y: number) =>
-    new Proxy(new vec2uImpl(x, y), vecProxyHandler) as v2u,
-  makeFromScalar: (x) => new Proxy(new vec2uImpl(x, x), vecProxyHandler) as v2u,
+  make: (x, y) => new Vec2uImpl(x, y) as unknown as v2u,
 }) as NativeVec2u;
 
 /**
@@ -654,9 +232,7 @@ export type NativeVec3f = Vec3f & { '~exotic': Vec3f } & ((
 export const vec3f = makeVecSchema({
   type: 'vec3f',
   length: 3,
-  make: (x, y, z) => new Proxy(new vec3fImpl(x, y, z), vecProxyHandler) as v3f,
-  makeFromScalar: (x) =>
-    new Proxy(new vec3fImpl(x, x, x), vecProxyHandler) as v3f,
+  make: (x, y, z) => new Vec3fImpl(x, y, z) as unknown as v3f,
 }) as NativeVec3f;
 
 /**
@@ -686,9 +262,7 @@ export type NativeVec3h = Vec3h & { '~exotic': Vec3h } & ((
 export const vec3h = makeVecSchema({
   type: 'vec3h',
   length: 3,
-  make: (x, y, z) => new Proxy(new vec3hImpl(x, y, z), vecProxyHandler) as v3h,
-  makeFromScalar: (x) =>
-    new Proxy(new vec3hImpl(x, x, x), vecProxyHandler) as v3h,
+  make: (x, y, z) => new Vec3hImpl(x, y, z) as unknown as v3h,
 }) as NativeVec3h;
 
 /**
@@ -718,9 +292,7 @@ export type NativeVec3i = Vec3i & { '~exotic': Vec3i } & ((
 export const vec3i = makeVecSchema({
   type: 'vec3i',
   length: 3,
-  make: (x, y, z) => new Proxy(new vec3iImpl(x, y, z), vecProxyHandler) as v3i,
-  makeFromScalar: (x) =>
-    new Proxy(new vec3iImpl(x, x, x), vecProxyHandler) as v3i,
+  make: (x, y, z) => new Vec3iImpl(x, y, z) as unknown as v3i,
 }) as NativeVec3i;
 
 /**
@@ -750,9 +322,7 @@ export type NativeVec3u = Vec3u & { '~exotic': Vec3u } & ((
 export const vec3u = makeVecSchema({
   type: 'vec3u',
   length: 3,
-  make: (x, y, z) => new Proxy(new vec3uImpl(x, y, z), vecProxyHandler) as v3u,
-  makeFromScalar: (x) =>
-    new Proxy(new vec3uImpl(x, x, x), vecProxyHandler) as v3u,
+  make: (x, y, z) => new Vec3uImpl(x, y, z) as unknown as v3u,
 }) as NativeVec3u;
 
 /**
@@ -783,10 +353,7 @@ export type NativeVec4f = Vec4f & { '~exotic': Vec4f } & ((
 export const vec4f = makeVecSchema({
   type: 'vec4f',
   length: 4,
-  make: (x, y, z, w) =>
-    new Proxy(new vec4fImpl(x, y, z, w), vecProxyHandler) as v4f,
-  makeFromScalar: (x) =>
-    new Proxy(new vec4fImpl(x, x, x, x), vecProxyHandler) as v4f,
+  make: (x, y, z, w) => new Vec4fImpl(x, y, z, w) as unknown as v4f,
 }) as NativeVec4f;
 
 /**
@@ -817,10 +384,7 @@ export type NativeVec4h = Vec4h & { '~exotic': Vec4h } & ((
 export const vec4h = makeVecSchema({
   type: 'vec4h',
   length: 4,
-  make: (x, y, z, w) =>
-    new Proxy(new vec4hImpl(x, y, z, w), vecProxyHandler) as v4h,
-  makeFromScalar: (x) =>
-    new Proxy(new vec4hImpl(x, x, x, x), vecProxyHandler) as v4h,
+  make: (x, y, z, w) => new Vec4hImpl(x, y, z, w) as unknown as v4h,
 }) as NativeVec4h;
 
 /**
@@ -851,10 +415,7 @@ export type NativeVec4i = Vec4i & { '~exotic': Vec4i } & ((
 export const vec4i = makeVecSchema({
   type: 'vec4i',
   length: 4,
-  make: (x, y, z, w) =>
-    new Proxy(new vec4iImpl(x, y, z, w), vecProxyHandler) as v4i,
-  makeFromScalar: (x) =>
-    new Proxy(new vec4iImpl(x, x, x, x), vecProxyHandler) as v4i,
+  make: (x, y, z, w) => new Vec4iImpl(x, y, z, w) as unknown as v4i,
 }) as NativeVec4i;
 
 /**
@@ -885,8 +446,5 @@ export type NativeVec4u = Vec4u & { '~exotic': Vec4u } & ((
 export const vec4u = makeVecSchema({
   length: 4,
   type: 'vec4u',
-  make: (x, y, z, w) =>
-    new Proxy(new vec4uImpl(x, y, z, w), vecProxyHandler) as v4u,
-  makeFromScalar: (x) =>
-    new Proxy(new vec4uImpl(x, x, x, x), vecProxyHandler) as v4u,
+  make: (x, y, z, w) => new Vec4uImpl(x, y, z, w) as unknown as v4u,
 }) as NativeVec4u;
