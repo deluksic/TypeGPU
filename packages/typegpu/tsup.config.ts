@@ -11,7 +11,7 @@ export default defineConfig({
   outDir: 'dist',
   format: ['cjs', 'esm'],
   tsconfig: './tsconfig.json',
-  target: 'es2017',
+  target: 'es2022',
   splitting: true,
   sourcemap: true,
   minify: !inDevMode,
