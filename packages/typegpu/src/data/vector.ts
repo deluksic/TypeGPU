@@ -12,7 +12,8 @@ import {
   Vec4hImpl,
   Vec4iImpl,
   Vec4uImpl,
-} from './vector-no-proxy';
+  type VecBase,
+} from './vectorImpl';
 import type {
   Vec2f,
   Vec2h,
@@ -40,49 +41,37 @@ import type {
   v4u,
 } from './wgslTypes';
 
-export type { VecKind } from './vector-no-proxy';
-
 // --------------
 // Implementation
 // --------------
-
-interface VecSchemaOptions<TType extends string, TValue> {
-  type: TType;
-  length: number;
-  make: (...args: number[]) => TValue;
-}
 
 type VecSchemaBase<TValue> = {
   readonly type: string;
   readonly '~repr': TValue;
 };
 
-function makeVecSchema<TType extends string, TValue>(
-  options: VecSchemaOptions<TType, TValue>,
+function makeVecSchema<TValue>(
+  VecImpl: new (...args: number[]) => VecBase,
 ): VecSchemaBase<TValue> & ((...args: number[]) => TValue) {
-  const VecSchema: VecSchemaBase<TValue> = {
-    /** Type-token, not available at runtime */
-    '~repr': undefined as unknown as TValue,
-    type: options.type,
-  };
+  const { kind: type, length: componentCount } = new VecImpl();
 
   const construct = (...args: number[]): TValue => {
     const values = args; // TODO: Allow users to pass in vectors that fill part of the values.
 
     if (inGPUMode()) {
-      return `${VecSchema.type}(${values.join(', ')})` as unknown as TValue;
+      return `${type}(${values.join(', ')})` as unknown as TValue;
     }
 
-    if (values.length <= 1 || values.length === options.length) {
-      return options.make(...values);
+    if (values.length <= 1 || values.length === componentCount) {
+      return new VecImpl(...values) as TValue;
     }
 
     throw new Error(
-      `'${options.type}' constructor called with invalid number of arguments.`,
+      `'${type}' constructor called with invalid number of arguments.`,
     );
   };
 
-  return Object.assign(construct, VecSchema);
+  return Object.assign(construct, { type, '~repr': undefined as TValue });
 }
 
 // ----------
@@ -112,11 +101,7 @@ export type NativeVec2f = Vec2f & { '~exotic': Vec2f } & ((
  * @example
  * const buffer = root.createBuffer(d.vec2f, d.vec2f(0, 1)); // buffer holding a d.vec2f value, with an initial value of vec2f(0, 1);
  */
-export const vec2f = makeVecSchema({
-  type: 'vec2f',
-  length: 2,
-  make: (x, y) => new Vec2fImpl(x, y) as unknown as v2f,
-}) as NativeVec2f;
+export const vec2f = makeVecSchema(Vec2fImpl) as NativeVec2f;
 
 /**
  * Type of the `d.vec2h` object/function: vector data type schema/constructor
@@ -141,11 +126,7 @@ export type NativeVec2h = Vec2h & { '~exotic': Vec2h } & ((
  * @example
  * const buffer = root.createBuffer(d.vec2h, d.vec2h(0, 1)); // buffer holding a d.vec2h value, with an initial value of vec2h(0, 1);
  */
-export const vec2h = makeVecSchema({
-  type: 'vec2h',
-  length: 2,
-  make: (x, y) => new Vec2hImpl(x, y) as unknown as v2h,
-}) as NativeVec2h;
+export const vec2h = makeVecSchema(Vec2hImpl) as NativeVec2h;
 
 /**
  * Type of the `d.vec2i` object/function: vector data type schema/constructor
@@ -170,11 +151,7 @@ export type NativeVec2i = Vec2i & { '~exotic': Vec2i } & ((
  * @example
  * const buffer = root.createBuffer(d.vec2i, d.vec2i(0, 1)); // buffer holding a d.vec2i value, with an initial value of vec2i(0, 1);
  */
-export const vec2i = makeVecSchema({
-  type: 'vec2i',
-  length: 2,
-  make: (x, y) => new Vec2iImpl(x, y) as unknown as v2i,
-}) as NativeVec2i;
+export const vec2i = makeVecSchema(Vec2iImpl) as NativeVec2i;
 
 /**
  * Type of the `d.vec2u` object/function: vector data type schema/constructor
@@ -199,11 +176,7 @@ export type NativeVec2u = Vec2u & { '~exotic': Vec2u } & ((
  * @example
  * const buffer = root.createBuffer(d.vec2u, d.vec2u(0, 1)); // buffer holding a d.vec2u value, with an initial value of vec2u(0, 1);
  */
-export const vec2u = makeVecSchema({
-  type: 'vec2u',
-  length: 2,
-  make: (x, y) => new Vec2uImpl(x, y) as unknown as v2u,
-}) as NativeVec2u;
+export const vec2u = makeVecSchema(Vec2uImpl) as NativeVec2u;
 
 /**
  * Type of the `d.vec3f` object/function: vector data type schema/constructor
@@ -229,11 +202,7 @@ export type NativeVec3f = Vec3f & { '~exotic': Vec3f } & ((
  * @example
  * const buffer = root.createBuffer(d.vec3f, d.vec3f(0, 1, 2)); // buffer holding a d.vec3f value, with an initial value of vec3f(0, 1, 2);
  */
-export const vec3f = makeVecSchema({
-  type: 'vec3f',
-  length: 3,
-  make: (x, y, z) => new Vec3fImpl(x, y, z) as unknown as v3f,
-}) as NativeVec3f;
+export const vec3f = makeVecSchema(Vec3fImpl) as NativeVec3f;
 
 /**
  * Type of the `d.vec3h` object/function: vector data type schema/constructor
@@ -259,11 +228,7 @@ export type NativeVec3h = Vec3h & { '~exotic': Vec3h } & ((
  * @example
  * const buffer = root.createBuffer(d.vec3h, d.vec3h(0, 1, 2)); // buffer holding a d.vec3h value, with an initial value of vec3h(0, 1, 2);
  */
-export const vec3h = makeVecSchema({
-  type: 'vec3h',
-  length: 3,
-  make: (x, y, z) => new Vec3hImpl(x, y, z) as unknown as v3h,
-}) as NativeVec3h;
+export const vec3h = makeVecSchema(Vec3hImpl) as NativeVec3h;
 
 /**
  * Type of the `d.vec3i` object/function: vector data type schema/constructor
@@ -289,11 +254,7 @@ export type NativeVec3i = Vec3i & { '~exotic': Vec3i } & ((
  * @example
  * const buffer = root.createBuffer(d.vec3i, d.vec3i(0, 1, 2)); // buffer holding a d.vec3i value, with an initial value of vec3i(0, 1, 2);
  */
-export const vec3i = makeVecSchema({
-  type: 'vec3i',
-  length: 3,
-  make: (x, y, z) => new Vec3iImpl(x, y, z) as unknown as v3i,
-}) as NativeVec3i;
+export const vec3i = makeVecSchema(Vec3iImpl) as NativeVec3i;
 
 /**
  * Type of the `d.vec3u` object/function: vector data type schema/constructor
@@ -319,11 +280,7 @@ export type NativeVec3u = Vec3u & { '~exotic': Vec3u } & ((
  * @example
  * const buffer = root.createBuffer(d.vec3u, d.vec3u(0, 1, 2)); // buffer holding a d.vec3u value, with an initial value of vec3u(0, 1, 2);
  */
-export const vec3u = makeVecSchema({
-  type: 'vec3u',
-  length: 3,
-  make: (x, y, z) => new Vec3uImpl(x, y, z) as unknown as v3u,
-}) as NativeVec3u;
+export const vec3u = makeVecSchema(Vec3uImpl) as NativeVec3u;
 
 /**
  * Type of the `d.vec4f` object/function: vector data type schema/constructor
@@ -350,11 +307,7 @@ export type NativeVec4f = Vec4f & { '~exotic': Vec4f } & ((
  * @example
  * const buffer = root.createBuffer(d.vec4f, d.vec4f(0, 1, 2, 3)); // buffer holding a d.vec4f value, with an initial value of vec4f(0, 1, 2, 3);
  */
-export const vec4f = makeVecSchema({
-  type: 'vec4f',
-  length: 4,
-  make: (x, y, z, w) => new Vec4fImpl(x, y, z, w) as unknown as v4f,
-}) as NativeVec4f;
+export const vec4f = makeVecSchema(Vec4fImpl) as NativeVec4f;
 
 /**
  * Type of the `d.vec4h` object/function: vector data type schema/constructor
@@ -381,11 +334,7 @@ export type NativeVec4h = Vec4h & { '~exotic': Vec4h } & ((
  * @example
  * const buffer = root.createBuffer(d.vec4h, d.vec4h(0, 1, 2, 3)); // buffer holding a d.vec4h value, with an initial value of vec4h(0, 1, 2, 3);
  */
-export const vec4h = makeVecSchema({
-  type: 'vec4h',
-  length: 4,
-  make: (x, y, z, w) => new Vec4hImpl(x, y, z, w) as unknown as v4h,
-}) as NativeVec4h;
+export const vec4h = makeVecSchema(Vec4hImpl) as NativeVec4h;
 
 /**
  * Type of the `d.vec4i` object/function: vector data type schema/constructor
@@ -412,11 +361,7 @@ export type NativeVec4i = Vec4i & { '~exotic': Vec4i } & ((
  * @example
  * const buffer = root.createBuffer(d.vec4i, d.vec4i(0, 1, 2, 3)); // buffer holding a d.vec4i value, with an initial value of vec4i(0, 1, 2, 3);
  */
-export const vec4i = makeVecSchema({
-  type: 'vec4i',
-  length: 4,
-  make: (x, y, z, w) => new Vec4iImpl(x, y, z, w) as unknown as v4i,
-}) as NativeVec4i;
+export const vec4i = makeVecSchema(Vec4iImpl) as NativeVec4i;
 
 /**
  * Type of the `d.vec4u` object/function: vector data type schema/constructor
@@ -443,8 +388,4 @@ export type NativeVec4u = Vec4u & { '~exotic': Vec4u } & ((
  * @example
  * const buffer = root.createBuffer(d.vec4u, d.vec4u(0, 1, 2, 3)); // buffer holding a d.vec4u value, with an initial value of vec4u(0, 1, 2, 3);
  */
-export const vec4u = makeVecSchema({
-  length: 4,
-  type: 'vec4u',
-  make: (x, y, z, w) => new Vec4uImpl(x, y, z, w) as unknown as v4u,
-}) as NativeVec4u;
+export const vec4u = makeVecSchema(Vec4uImpl) as NativeVec4u;
