@@ -92,3 +92,27 @@ export const limitAlong = tgpu.fn([vec2f, vec2f, vec2f, bool], vec2f)(
     return select(a, b, (dotA < dotB) !== invert);
   },
 );
+
+const Intersection = struct({
+  valid: bool,
+  t: f32,
+  point: vec2f,
+});
+
+export const intersectLines = tgpu.fn(
+  [vec2f, vec2f, vec2f, vec2f],
+  Intersection,
+)(
+  (a, b, c, d) => {
+    const r = sub(b, a);
+    const s = sub(d, c);
+    const rxs = r.x * s.y - r.y * s.x;
+    const AC = sub(c, a);
+    const t = (AC.x * s.y - AC.y * s.x) / rxs;
+    return {
+      valid: rxs !== 0,
+      t,
+      point: addMul(a, r, t),
+    };
+  },
+);

@@ -2,8 +2,8 @@ import tgpu from 'typegpu';
 import * as d from 'typegpu/data';
 import type { ColorAttachment } from '../../../../../../../packages/typegpu/src/core/pipeline/renderPipeline.ts';
 import {
-  add,
   arrayLength,
+  clamp,
   cos,
   dot,
   max,
@@ -19,6 +19,7 @@ import {
   addMul,
   cross2d,
   externalNormals,
+  intersectLines,
   limitAlong,
   miterPoint,
   ortho2d,
@@ -220,8 +221,8 @@ const mainVertex = tgpu['~unstable'].vertexFn({
   const flip = sign(B.radius - C.radius);
   const cAB2BC1 = flip * cross2d(nAB2, nBC1) > 0;
   const cAB1BC2 = flip * cross2d(nAB1, nBC2) < 0;
-  const h_ = normalize(add(nBC1, nBC2));
-  const h = mul(h_, flip);
+  const h_ = normalize(BC);
+  const h = mul(h_, -flip);
   if (dot(nmB1, nmB2) > 0) {
     if (cAB2BC1) {
       if (cAB1BC2) {
@@ -283,12 +284,24 @@ const mainVertex = tgpu['~unstable'].vertexFn({
   const v1 = addMul(B.position, select(nBC1, mB1, reverseMiterB1), B.radius);
   const v2 = addMul(C.position, select(nBC1, mC1, reverseMiterC1), C.radius);
   const v3 = addMul(C.position, select(hC1, mC1, reverseMiterC1), C.radius);
-  const v4 = select(B.position, v1, reverseMiterB1 && reverseMiterB2);
-  const v5 = select(C.position, v2, reverseMiterC1 && reverseMiterC2);
+
   const v6 = addMul(B.position, select(hB2, mB2, reverseMiterB2), B.radius);
   const v7 = addMul(B.position, select(nBC2, mB2, reverseMiterB2), B.radius);
   const v8 = addMul(C.position, select(nBC2, mC2, reverseMiterC2), C.radius);
   const v9 = addMul(C.position, select(hC2, mC2, reverseMiterC2), C.radius);
+
+  const centerB = intersectLines(nAB1, nAB2, nBC1, nBC2);
+  const centerC = intersectLines(nCD1, nCD2, nBC1, nBC2);
+  const v4 = select(
+    B.position,
+    addMul(B.position, centerB.point, B.radius),
+    centerB.valid && centerB.t >= 0 && centerB.t <= 1,
+  );
+  const v5 = select(
+    C.position,
+    addMul(C.position, centerC.point, C.radius),
+    centerC.valid && centerC.t >= 0 && centerC.t <= 1,
+  );
 
   const tC1limit = addMul(C.position, nBC1, C.radius);
   const tC2limit = addMul(C.position, nBC2, C.radius);
@@ -303,6 +316,20 @@ const mainVertex = tgpu['~unstable'].vertexFn({
   const v3fix = limitAlong(v3, tB1limit, tBC1, true);
   const v8fix = limitAlong(v8, tB2limit, tBC2, false);
   const v9fix = limitAlong(v9, tB2limit, tBC2, false);
+
+  const v4fix = select(v4, v1, reverseMiterB1 && reverseMiterB2);
+  const v4fixfix = select(
+    v4fix,
+    addMul(B.position, h_, B.radius),
+    dot(nmB1, nmB2) > 0 && !cAB1BC2 && !cAB2BC1,
+  );
+
+  const v5fix = select(v5, v2, reverseMiterC1 && reverseMiterC2);
+  const v5fixfix = select(
+    v5fix,
+    addMul(C.position, h_, C.radius),
+    dot(nmC1, nmC2) > 0 && !cBC1CD2 && !cBC2CD1,
+  );
 
   const points = [
     v0,
@@ -322,8 +349,8 @@ const mainVertex = tgpu['~unstable'].vertexFn({
     v1fix,
     v2fix,
     v3fix,
-    v4,
-    v5,
+    v4fixfix,
+    v5fixfix,
     v6fix,
     v7fix,
     v8fix,
@@ -410,7 +437,10 @@ const outlinePipeline = root['~unstable']
   .createPipeline()
   .withIndexBuffer(outlineIndexBuffer);
 
-const CIRCLE_SEGMENT_COUNT = 64;
+const CIRCLE_SEGMENT_COUNT = 256;
+const CIRCLE_MIN_STEP = 2 * Math.PI / CIRCLE_SEGMENT_COUNT;
+const CIRCLE_MAX_STEP = Math.PI / 8;
+const CIRCLE_DASH_LEN = 0.0025 * Math.PI;
 
 const circlesVertex = tgpu['~unstable'].vertexFn({
   in: {
@@ -422,7 +452,12 @@ const circlesVertex = tgpu['~unstable'].vertexFn({
   },
 })(({ instanceIndex, vertexIndex }) => {
   const vertex = bindGroupLayout.$.lineVertices[instanceIndex];
-  const angle = 2 * Math.PI * d.f32(vertexIndex) / CIRCLE_SEGMENT_COUNT;
+  const step = clamp(
+    CIRCLE_DASH_LEN / vertex.radius,
+    CIRCLE_MIN_STEP,
+    CIRCLE_MAX_STEP,
+  );
+  const angle = min(2 * Math.PI, step * d.f32(vertexIndex));
   const unit = d.vec2f(cos(angle), sin(angle));
   return {
     outPos: d.vec4f(addMul(vertex.position, unit, vertex.radius), 0, 1),
@@ -437,7 +472,7 @@ const circlesPipeline = root['~unstable']
   })
   .withMultisample({ count: multisample ? 4 : 1 })
   .withPrimitive({
-    topology: 'line-strip',
+    topology: 'line-list',
   })
   .createPipeline();
 
