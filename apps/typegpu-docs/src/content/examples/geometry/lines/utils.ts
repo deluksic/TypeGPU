@@ -8,21 +8,33 @@ import {
   mul,
   normalize,
   select,
+  sign,
   sqrt,
   sub,
 } from 'typegpu/std';
+
+export const cross2d = tgpu.fn([vec2f, vec2f], f32)((a, b) => {
+  return a.x * b.y - a.y * b.x;
+});
+
+/**
+ * Finds mid direction between two vectors. The direction will always be on the CW part
+ * between the vectors.
+ */
+export const midDirection = tgpu.fn([vec2f, vec2f], vec2f)((a, b) => {
+  return mul(normalize(add(a, b)), -sign(cross2d(a, b)));
+});
 
 /**
  * Finds miter point given two vectors on a unit circle.
  */
 export const miterPoint = tgpu.fn([vec2f, vec2f], vec2f)((a, b) => {
+  if (cross2d(a, b) < 0) {
+    return mul(normalize(add(a, b)), -1e6);
+  }
   const ab = add(a, b);
   const len2 = dot(ab, ab);
   return mul(ab, 2 / len2);
-});
-
-export const cross2d = tgpu.fn([vec2f, vec2f], f32)((a, b) => {
-  return a.x * b.y - a.y * b.x;
 });
 
 export const triangleWinding = tgpu.fn(
@@ -47,13 +59,9 @@ export const ortho2d = tgpu.fn([vec2f], vec2f)((v) => {
   return vec2f(-v.y, v.x);
 });
 
-const clampLength2 = tgpu.fn([vec2f, f32], vec2f)(
-  (v, maxLength) => {
-    const len = length(v);
-    const clampedLen = min(len, maxLength) / select(1, len, len > 0);
-    return mul(v, clampedLen);
-  },
-);
+export const ortho2dNeg = tgpu.fn([vec2f], vec2f)((v) => {
+  return vec2f(v.y, -v.x);
+});
 
 const ExternalNormals = struct({
   n1: vec2f,
@@ -89,7 +97,7 @@ export const limitAlong = tgpu.fn([vec2f, vec2f, vec2f, bool], vec2f)(
   (a, b, dir, invert) => {
     const dotA = dot(a, dir);
     const dotB = dot(b, dir);
-    return select(a, b, (dotA < dotB) !== invert);
+    return select(a, b, (dotA >= dotB) === invert);
   },
 );
 
@@ -116,3 +124,7 @@ export const intersectLines = tgpu.fn(
     };
   },
 );
+
+export const clampLength = tgpu.fn([vec2f, f32], vec2f)((v, maxLength) => {
+  return mul(normalize(v), min(length(v), maxLength));
+});
