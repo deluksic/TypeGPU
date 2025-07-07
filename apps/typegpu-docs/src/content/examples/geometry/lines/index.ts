@@ -8,22 +8,19 @@ import {
   dot,
   max,
   min,
-  mul,
   normalize,
   select,
-  sign,
   sin,
   sub,
 } from 'typegpu/std';
 import {
   addMul,
-  cross2d,
   externalNormals,
-  intersectLines,
   limitAlong,
-  miterPoint,
   ortho2d,
+  ortho2dNeg,
 } from './utils.ts';
+import { solveJoin } from './lines.ts';
 
 const presentationFormat = navigator.gpu.getPreferredCanvasFormat();
 const canvas = document.querySelector('canvas');
@@ -87,12 +84,12 @@ const bindGroupLayout = tgpu.bindGroupLayout({
 
 const lineVertices = [
   LineVertex({
-    position: d.vec2f(-0.9, 0),
+    position: d.vec2f(-0.7, 0),
     radius: 0.05,
   }),
   LineVertex({
-    position: d.vec2f(-0.8, 0),
-    radius: 0.3,
+    position: d.vec2f(-0.6, 0),
+    radius: 0.25,
   }),
   LineVertex({
     position: d.vec2f(-0.2, 0),
@@ -103,7 +100,7 @@ const lineVertices = [
     radius: 0.2,
   }),
   LineVertex({
-    position: d.vec2f(0.8, 0),
+    position: d.vec2f(0.4, 0.4),
     radius: 0.05,
   }),
 ];
@@ -118,14 +115,14 @@ const uniformsBindGroup = root.createBindGroup(bindGroupLayout, {
 
 // deno-fmt-ignore
 const indices = [
-  0, 4, 1,
-  4, 7, 1,
-  6, 7, 4,
-  1, 7, 2,
-  2, 7, 8,
-  3, 2, 5,
-  5, 2, 8,
-  8, 9, 5,
+  0, 2, 1,
+  1, 2, 3,
+  2, 4, 3,
+  3, 6, 1,
+  6, 3, 8,
+  5, 6, 7,
+  7, 6, 8,
+  8, 9, 7,
 ];
 const indexBuffer = root.createBuffer(d.arrayOf(d.u16, indices.length), indices)
   .$usage('index');
@@ -133,20 +130,21 @@ const indexBuffer = root.createBuffer(d.arrayOf(d.u16, indices.length), indices)
 // deno-fmt-ignore
 const outlineIndices = [
   0, 1,
-  0, 4,
-  1, 4,
-  4, 7,
-  4, 6,
-  6, 7,
+  0, 2,
   1, 2,
-  1, 7,
-  2, 7,
-  2, 8,
-  7, 8,
+  1, 3,
   2, 3,
-  2, 5,
-  3, 5,
-  5, 8,
+  2, 4,
+  3, 4,
+  1, 6,
+  3, 6,
+  3, 8,
+  6, 8,
+  5, 6,
+  5, 7,
+  6, 7,
+  7, 8,
+  7, 9,
   8, 9,
 ];
 const outlineIndexBuffer = root.createBuffer(
@@ -164,12 +162,6 @@ const mainVertex = tgpu['~unstable'].vertexFn({
     instanceIndex: d.interpolate('flat', d.u32),
   },
 })(({ vertexIndex, instanceIndex }) => {
-  // if (instanceIndex === 0) {
-  //   return {
-  //     outPos: d.vec4f(0, 0, 0, 0),
-  //     instanceIndex: 0,
-  //   };
-  // }
   const firstIndex = max(0, d.i32(instanceIndex) - 1);
   const lastIndex = min(
     arrayLength(bindGroupLayout.$.lineVertices) - 1,
@@ -184,182 +176,80 @@ const mainVertex = tgpu['~unstable'].vertexFn({
   const BC = sub(C.position, B.position);
   const CD = sub(D.position, C.position);
 
-  const externalAB = externalNormals(AB, A.radius, B.radius);
-  const externalBC = externalNormals(BC, B.radius, C.radius);
-  const externalCD = externalNormals(CD, C.radius, D.radius);
+  const radiusABDelta = A.radius - B.radius;
+  const radiusBCDelta = B.radius - C.radius;
+  const radiusCDDelta = C.radius - D.radius;
 
-  const nAB1 = externalAB.n1;
-  const nAB2 = externalAB.n2;
-  const nBC1 = externalBC.n1;
-  const nBC2 = externalBC.n2;
-  const nCD1 = externalCD.n1;
-  const nCD2 = externalCD.n2;
-
-  const tBC1 = ortho2d(nBC1);
-  const tBC2 = ortho2d(nBC2);
-
-  const mB1 = miterPoint(nAB1, nBC1);
-  const mB2 = miterPoint(nAB2, nBC2);
-  const mC1 = miterPoint(nBC1, nCD1);
-  const mC2 = miterPoint(nBC2, nCD2);
-
-  const nmB1 = normalize(mB1);
-  const nmB2 = normalize(mB2);
-  const nmC1 = normalize(mC1);
-  const nmC2 = normalize(mC2);
-
-  const cmB1 = cross2d(nAB1, nBC1);
-  const cmB2 = cross2d(nAB2, nBC2);
-  const cmC1 = cross2d(nBC1, nCD1);
-  const cmC2 = cross2d(nBC2, nCD2);
-
-  let hB1 = nmB1;
-  let hB2 = nmB2;
-  let hC1 = nmC1;
-  let hC2 = nmC2;
-
-  const flip = sign(B.radius - C.radius);
-  const cAB2BC1 = flip * cross2d(nAB2, nBC1) > 0;
-  const cAB1BC2 = flip * cross2d(nAB1, nBC2) < 0;
-  const h_ = normalize(BC);
-  const h = mul(h_, -flip);
-  if (dot(nmB1, nmB2) > 0) {
-    if (cAB2BC1) {
-      if (cAB1BC2) {
-        hB1 = h;
-      } else {
-        hB1 = mul(hB1, -1);
-      }
-    } else {
-      if (!cAB1BC2) {
-        hB1 = h_;
-      }
-    }
-    if (cAB1BC2) {
-      if (cAB2BC1) {
-        hB2 = h;
-      } else {
-        hB2 = mul(hB2, -1);
-      }
-    } else {
-      if (!cAB2BC1) {
-        hB2 = h_;
-      }
-    }
+  // segment where one end completely contains the other
+  // is skipped
+  if (dot(BC, BC) < radiusBCDelta * radiusBCDelta) {
+    return {
+      outPos: d.vec4f(0, 0, 0, 0),
+      instanceIndex: 0,
+    };
   }
 
-  const cBC1CD2 = flip * cross2d(nBC1, nCD2) < 0;
-  const cBC2CD1 = flip * cross2d(nBC2, nCD1) > 0;
-  if (dot(nmC1, nmC2) > 0) {
-    if (cBC1CD2) {
-      if (cBC2CD1) {
-        hC1 = h;
-      } else {
-        hC1 = mul(hC1, -1);
-      }
-    } else {
-      if (!cBC2CD1) {
-        hC1 = h_;
-      }
-    }
-    if (cBC2CD1) {
-      if (cBC1CD2) {
-        hC2 = h;
-      } else {
-        hC2 = mul(hC2, -1);
-      }
-    } else {
-      if (!cBC1CD2) {
-        hC2 = h_;
-      }
-    }
-  }
+  const isCapB = dot(AB, AB) <= radiusABDelta * radiusABDelta;
+  const isCapC = dot(CD, CD) <= radiusCDDelta * radiusCDDelta;
 
-  const reverseMiterB1 = dot(nmB1, nmB2) < 0 && cmB1 > 0;
-  const reverseMiterB2 = dot(nmB1, nmB2) < 0 && cmB2 < 0;
-  const reverseMiterC1 = dot(nmC1, nmC2) < 0 && cmC1 > 0;
-  const reverseMiterC2 = dot(nmC1, nmC2) < 0 && cmC2 < 0;
+  const eAB = externalNormals(AB, A.radius, B.radius);
+  const eBC = externalNormals(BC, B.radius, C.radius);
+  const eCD = externalNormals(CD, C.radius, D.radius);
 
-  const v0 = addMul(B.position, select(hB1, mB1, reverseMiterB1), B.radius);
-  const v1 = addMul(B.position, select(nBC1, mB1, reverseMiterB1), B.radius);
-  const v2 = addMul(C.position, select(nBC1, mC1, reverseMiterC1), C.radius);
-  const v3 = addMul(C.position, select(hC1, mC1, reverseMiterC1), C.radius);
+  const nAB = select(normalize(AB), d.vec2f(), isCapB);
+  const nBC = select(normalize(BC), d.vec2f(), isCapC);
 
-  const v6 = addMul(B.position, select(hB2, mB2, reverseMiterB2), B.radius);
-  const v7 = addMul(B.position, select(nBC2, mB2, reverseMiterB2), B.radius);
-  const v8 = addMul(C.position, select(nBC2, mC2, reverseMiterC2), C.radius);
-  const v9 = addMul(C.position, select(hC2, mC2, reverseMiterC2), C.radius);
+  const joinB = solveJoin(nAB, eAB.n1, eBC.n1, eAB.n2, eBC.n2);
 
-  const centerB = intersectLines(nAB1, nAB2, nBC1, nBC2);
-  const centerC = intersectLines(nCD1, nCD2, nBC1, nBC2);
-  const v4 = select(
-    B.position,
-    addMul(B.position, centerB.point, B.radius),
-    centerB.valid && centerB.t >= 0 && centerB.t <= 1,
-  );
-  const v5 = select(
-    C.position,
-    addMul(C.position, centerC.point, C.radius),
-    centerC.valid && centerC.t >= 0 && centerC.t <= 1,
-  );
+  const v0 = addMul(B.position, joinB.u, B.radius);
+  const v1 = addMul(B.position, joinB.uR, B.radius);
+  const v2 = addMul(B.position, joinB.c, B.radius);
+  const v3 = addMul(B.position, joinB.dR, B.radius);
+  const v4 = addMul(B.position, joinB.d, B.radius);
 
-  const tC1limit = addMul(C.position, nBC1, C.radius);
-  const tC2limit = addMul(C.position, nBC2, C.radius);
-  const v0fix = limitAlong(v0, tC1limit, tBC1, false);
-  const v1fix = limitAlong(v1, tC1limit, tBC1, false);
-  const v6fix = limitAlong(v6, tC2limit, tBC2, true);
-  const v7fix = limitAlong(v7, tC2limit, tBC2, true);
+  const joinC = solveJoin(nBC, eBC.n1, eCD.n1, eBC.n2, eCD.n2);
 
-  const tB1limit = addMul(B.position, nBC1, B.radius);
-  const tB2limit = addMul(B.position, nBC2, B.radius);
-  const v2fix = limitAlong(v2, tB1limit, tBC1, true);
-  const v3fix = limitAlong(v3, tB1limit, tBC1, true);
-  const v8fix = limitAlong(v8, tB2limit, tBC2, false);
-  const v9fix = limitAlong(v9, tB2limit, tBC2, false);
+  const v5 = addMul(C.position, joinC.u, C.radius);
+  const v6 = addMul(C.position, joinC.uL, C.radius);
+  const v7 = addMul(C.position, joinC.c, C.radius);
+  const v8 = addMul(C.position, joinC.dL, C.radius);
+  const v9 = addMul(C.position, joinC.d, C.radius);
 
-  const v4fix = select(v4, v1, reverseMiterB1 && reverseMiterB2);
-  const v4fixfix = select(
-    v4fix,
-    addMul(B.position, h_, B.radius),
-    dot(nmB1, nmB2) > 0 && !cAB1BC2 && !cAB2BC1,
-  );
+  // const points = [v0, v1, v2, v3, v4, v5, v6, v7, v8, v9];
 
-  const v5fix = select(v5, v2, reverseMiterC1 && reverseMiterC2);
-  const v5fixfix = select(
-    v5fix,
-    addMul(C.position, h_, C.radius),
-    dot(nmC1, nmC2) > 0 && !cBC1CD2 && !cBC2CD1,
-  );
+  const tBC1 = ortho2d(eBC.n1);
+  const tBC2 = ortho2dNeg(eBC.n2);
 
-  const points = [
-    v0,
-    v1,
-    v2,
-    v3,
-    v4,
-    v5,
-    v6,
-    v7,
-    v8,
-    v9,
-  ];
+  const limB1 = addMul(C.position, eBC.n1, C.radius);
+  const limB2 = addMul(C.position, eBC.n2, C.radius);
+  const v0fix = limitAlong(v0, limB1, tBC1, false);
+  const v1fix = limitAlong(v1, limB1, tBC1, false);
+  const v3fix = limitAlong(v3, limB2, tBC2, false);
+  const v4fix = limitAlong(v4, limB2, tBC2, false);
+
+  const limC1 = addMul(B.position, eBC.n1, B.radius);
+  const limC2 = addMul(B.position, eBC.n2, B.radius);
+  const v5fix = limitAlong(v5, limC1, tBC1, true);
+  const v6fix = limitAlong(v6, limC1, tBC1, true);
+  const v8fix = limitAlong(v8, limC2, tBC2, true);
+  const v9fix = limitAlong(v9, limC2, tBC2, true);
 
   const pointsFix = [
     v0fix,
     v1fix,
-    v2fix,
+    v2,
     v3fix,
-    v4fixfix,
-    v5fixfix,
+    v4fix,
+    v5fix,
     v6fix,
-    v7fix,
+    v7,
     v8fix,
     v9fix,
   ];
 
   return {
     outPos: d.vec4f(pointsFix[vertexIndex], 0.0, 1.0),
-    instanceIndex,
+    instanceIndex: select(d.u32(0), d.u32(1), isCapB || isCapC),
   };
 });
 
@@ -374,12 +264,15 @@ const mainFragment = tgpu['~unstable'].fragmentFn({
   out: d.vec4f,
 })(({ position, instanceIndex, frontFacing }) => {
   const colors = [
-    d.vec3f(1, 0, 0),
-    d.vec3f(0, 1, 0),
-    d.vec3f(0, 0, 1),
-    d.vec3f(1, 0, 1),
+    d.vec3f(1, 0, 0), // 0
+    d.vec3f(0, 1, 0), // 1
+    d.vec3f(0, 0, 1), // 2
+    d.vec3f(1, 0, 1), // 3
+    d.vec3f(1, 1, 0), // 4
+    d.vec3f(0, 1, 1), // 5
+    d.vec3f(0, 0, 0),
   ];
-  const color = colors[(instanceIndex % 12) % 4];
+  const color = colors[(instanceIndex % 12) % 7];
   if (frontFacing) {
     return d.vec4f(color, 0.2);
   }
@@ -476,7 +369,7 @@ const circlesPipeline = root['~unstable']
   })
   .createPipeline();
 
-const draw = (frameId: number) => {
+const draw = () => {
   const colorAttachment: ColorAttachment = {
     ...(multisample
       ? {
@@ -498,7 +391,7 @@ const draw = (frameId: number) => {
   outlinePipeline
     .with(bindGroupLayout, uniformsBindGroup)
     .withColorAttachment(colorAttachment)
-    .drawIndexed(32, 4);
+    .drawIndexed(outlineIndices.length, 4);
 
   circlesPipeline
     .with(bindGroupLayout, uniformsBindGroup)
@@ -506,9 +399,8 @@ const draw = (frameId: number) => {
     .draw(CIRCLE_SEGMENT_COUNT + 1, 4 + 1);
 };
 
-let frameId = 0;
 const runAnimationFrame = () => {
-  draw(frameId++);
+  draw();
   requestAnimationFrame(runAnimationFrame);
 };
 runAnimationFrame();
