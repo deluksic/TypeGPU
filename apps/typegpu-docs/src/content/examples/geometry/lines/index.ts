@@ -17,10 +17,13 @@ import {
   addMul,
   externalNormals,
   limitAlong,
+  midDirection,
+  midDirectionNoCheck,
   ortho2d,
   ortho2dNeg,
 } from './utils.ts';
 import { solveCap, solveJoin } from './lines.ts';
+import { indicesCapLevel2, outlineIndicesCapLevel2 } from './indices.ts';
 
 const presentationFormat = navigator.gpu.getPreferredCanvasFormat();
 const canvas = document.querySelector('canvas');
@@ -84,11 +87,11 @@ const bindGroupLayout = tgpu.bindGroupLayout({
 
 const lineVertices = [
   LineVertex({
-    position: d.vec2f(-0.7, 0),
+    position: d.vec2f(-0.55, 0),
     radius: 0.05,
   }),
   LineVertex({
-    position: d.vec2f(-0.6, 0),
+    position: d.vec2f(-0.4, 0),
     radius: 0.25,
   }),
   LineVertex({
@@ -113,43 +116,15 @@ const uniformsBindGroup = root.createBindGroup(bindGroupLayout, {
   lineVertices: lineVerticesBuffer,
 });
 
-// deno-fmt-ignore
-const indices = [
-  0, 2, 1,
-  1, 2, 3,
-  2, 4, 3,
-  3, 6, 1,
-  6, 3, 8,
-  5, 6, 7,
-  7, 6, 8,
-  8, 9, 7,
-];
-const indexBuffer = root.createBuffer(d.arrayOf(d.u16, indices.length), indices)
+const indexBuffer = root.createBuffer(
+  d.arrayOf(d.u16, indicesCapLevel2.length),
+  indicesCapLevel2,
+)
   .$usage('index');
 
-// deno-fmt-ignore
-const outlineIndices = [
-  0, 1,
-  0, 2,
-  1, 2,
-  1, 3,
-  2, 3,
-  2, 4,
-  3, 4,
-  1, 6,
-  3, 6,
-  3, 8,
-  6, 8,
-  5, 6,
-  5, 7,
-  6, 7,
-  7, 8,
-  7, 9,
-  8, 9,
-];
 const outlineIndexBuffer = root.createBuffer(
-  d.arrayOf(d.u16, outlineIndices.length),
-  outlineIndices,
+  d.arrayOf(d.u16, outlineIndicesCapLevel2.length),
+  outlineIndicesCapLevel2,
 ).$usage('index');
 
 const mainVertex = tgpu['~unstable'].vertexFn({
@@ -242,7 +217,38 @@ const mainVertex = tgpu['~unstable'].vertexFn({
     v9 = limitAlong(v9, limC2, tBC2, true);
   }
 
-  const points = [v0, v1, v2, v3, v4, v5, v6, v7, v8, v9];
+  // caps l1 these need the check as the angle can still be > 180
+  const d10 = midDirection(joinB.u, joinB.uR);
+  const d11 = midDirection(joinB.dR, joinB.d);
+  const d12 = midDirection(joinC.uL, joinC.u);
+  const d13 = midDirection(joinC.d, joinC.dL);
+
+  const v10 = addMul(B.position, d10, B.radius);
+  const v11 = addMul(B.position, d11, B.radius);
+  const v12 = addMul(C.position, d12, C.radius);
+  const v13 = addMul(C.position, d13, C.radius);
+
+  // caps l2
+  const d14 = midDirectionNoCheck(joinB.u, d10);
+  const d15 = midDirectionNoCheck(d10, joinB.uR);
+  const d16 = midDirectionNoCheck(joinB.dR, d11);
+  const d17 = midDirectionNoCheck(d11, joinB.d);
+  const d18 = midDirectionNoCheck(joinC.u, d12);
+  const d19 = midDirectionNoCheck(d12, joinC.uL);
+  const d20 = midDirectionNoCheck(joinC.dL, d13);
+  const d21 = midDirectionNoCheck(d13, joinC.d);
+
+  const v14 = addMul(B.position, d14, B.radius);
+  const v15 = addMul(B.position, d15, B.radius);
+  const v16 = addMul(B.position, d16, B.radius);
+  const v17 = addMul(B.position, d17, B.radius);
+  const v18 = addMul(C.position, d18, C.radius);
+  const v19 = addMul(C.position, d19, C.radius);
+  const v20 = addMul(C.position, d20, C.radius);
+  const v21 = addMul(C.position, d21, C.radius);
+
+  // deno-fmt-ignore
+  const points = [v0, v1, v2, v3, v4, v5, v6, v7, v8, v9, v10, v11, v12, v13, v14, v15, v16, v17, v18, v19, v20, v21];
 
   return {
     outPos: d.vec4f(points[vertexIndex], 0.0, 1.0),
@@ -383,12 +389,12 @@ const draw = () => {
   pipeline
     .with(bindGroupLayout, uniformsBindGroup)
     .withColorAttachment({ ...colorAttachment, loadOp: 'clear' })
-    .drawIndexed(24, 4);
+    .drawIndexed(indicesCapLevel2.length, 4);
 
   outlinePipeline
     .with(bindGroupLayout, uniformsBindGroup)
     .withColorAttachment(colorAttachment)
-    .drawIndexed(outlineIndices.length, 4);
+    .drawIndexed(outlineIndicesCapLevel2.length, 4);
 
   circlesPipeline
     .with(bindGroupLayout, uniformsBindGroup)
