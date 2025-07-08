@@ -20,7 +20,7 @@ import {
   ortho2d,
   ortho2dNeg,
 } from './utils.ts';
-import { solveJoin } from './lines.ts';
+import { solveCap, solveJoin } from './lines.ts';
 
 const presentationFormat = navigator.gpu.getPreferredCanvasFormat();
 const canvas = document.querySelector('canvas');
@@ -196,60 +196,57 @@ const mainVertex = tgpu['~unstable'].vertexFn({
   const eBC = externalNormals(BC, B.radius, C.radius);
   const eCD = externalNormals(CD, C.radius, D.radius);
 
-  const nAB = select(normalize(AB), d.vec2f(), isCapB);
-  const nBC = select(normalize(BC), d.vec2f(), isCapC);
+  const nAB = normalize(AB);
+  const nBC = normalize(BC);
 
-  const joinB = solveJoin(nAB, eAB.n1, eBC.n1, eAB.n2, eBC.n2);
+  let joinB = solveCap(eBC.n1, eBC.n2);
+  if (!isCapB) {
+    joinB = solveJoin(nAB, eAB.n1, eBC.n1, eAB.n2, eBC.n2);
+  }
 
-  const v0 = addMul(B.position, joinB.u, B.radius);
-  const v1 = addMul(B.position, joinB.uR, B.radius);
+  let v0 = addMul(B.position, joinB.u, B.radius);
+  let v1 = addMul(B.position, joinB.uR, B.radius);
   const v2 = addMul(B.position, joinB.c, B.radius);
-  const v3 = addMul(B.position, joinB.dR, B.radius);
-  const v4 = addMul(B.position, joinB.d, B.radius);
+  let v3 = addMul(B.position, joinB.dR, B.radius);
+  let v4 = addMul(B.position, joinB.d, B.radius);
 
-  const joinC = solveJoin(nBC, eBC.n1, eCD.n1, eBC.n2, eCD.n2);
+  let joinC = solveCap(eBC.n2, eBC.n1);
+  if (!isCapC) {
+    joinC = solveJoin(nBC, eBC.n1, eCD.n1, eBC.n2, eCD.n2);
+  }
 
-  const v5 = addMul(C.position, joinC.u, C.radius);
-  const v6 = addMul(C.position, joinC.uL, C.radius);
+  let v5 = addMul(C.position, joinC.u, C.radius);
+  let v6 = addMul(C.position, joinC.uL, C.radius);
   const v7 = addMul(C.position, joinC.c, C.radius);
-  const v8 = addMul(C.position, joinC.dL, C.radius);
-  const v9 = addMul(C.position, joinC.d, C.radius);
-
-  // const points = [v0, v1, v2, v3, v4, v5, v6, v7, v8, v9];
+  let v8 = addMul(C.position, joinC.dL, C.radius);
+  let v9 = addMul(C.position, joinC.d, C.radius);
 
   const tBC1 = ortho2d(eBC.n1);
   const tBC2 = ortho2dNeg(eBC.n2);
 
-  const limB1 = addMul(C.position, eBC.n1, C.radius);
-  const limB2 = addMul(C.position, eBC.n2, C.radius);
-  const v0fix = limitAlong(v0, limB1, tBC1, false);
-  const v1fix = limitAlong(v1, limB1, tBC1, false);
-  const v3fix = limitAlong(v3, limB2, tBC2, false);
-  const v4fix = limitAlong(v4, limB2, tBC2, false);
+  if (!isCapB) {
+    const limB1 = addMul(C.position, eBC.n1, C.radius);
+    const limB2 = addMul(C.position, eBC.n2, C.radius);
+    v0 = limitAlong(v0, limB1, tBC1, false);
+    v1 = limitAlong(v1, limB1, tBC1, false);
+    v3 = limitAlong(v3, limB2, tBC2, false);
+    v4 = limitAlong(v4, limB2, tBC2, false);
+  }
 
-  const limC1 = addMul(B.position, eBC.n1, B.radius);
-  const limC2 = addMul(B.position, eBC.n2, B.radius);
-  const v5fix = limitAlong(v5, limC1, tBC1, true);
-  const v6fix = limitAlong(v6, limC1, tBC1, true);
-  const v8fix = limitAlong(v8, limC2, tBC2, true);
-  const v9fix = limitAlong(v9, limC2, tBC2, true);
+  if (!isCapC) {
+    const limC1 = addMul(B.position, eBC.n1, B.radius);
+    const limC2 = addMul(B.position, eBC.n2, B.radius);
+    v5 = limitAlong(v5, limC1, tBC1, true);
+    v6 = limitAlong(v6, limC1, tBC1, true);
+    v8 = limitAlong(v8, limC2, tBC2, true);
+    v9 = limitAlong(v9, limC2, tBC2, true);
+  }
 
-  const pointsFix = [
-    v0fix,
-    v1fix,
-    v2,
-    v3fix,
-    v4fix,
-    v5fix,
-    v6fix,
-    v7,
-    v8fix,
-    v9fix,
-  ];
+  const points = [v0, v1, v2, v3, v4, v5, v6, v7, v8, v9];
 
   return {
-    outPos: d.vec4f(pointsFix[vertexIndex], 0.0, 1.0),
-    instanceIndex: select(d.u32(0), d.u32(1), isCapB || isCapC),
+    outPos: d.vec4f(points[vertexIndex], 0.0, 1.0),
+    instanceIndex,
   };
 });
 
@@ -312,7 +309,7 @@ const pipeline = root['~unstable']
   })
   .withMultisample({ count: multisample ? 4 : 1 })
   .withPrimitive({
-    cullMode: 'back',
+    // cullMode: 'back',
   })
   .createPipeline()
   .withIndexBuffer(indexBuffer);
