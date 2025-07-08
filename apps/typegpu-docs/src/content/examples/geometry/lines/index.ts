@@ -217,27 +217,45 @@ const mainVertex = tgpu['~unstable'].vertexFn({
     v9 = limitAlong(v9, limC2, tBC2, true);
   }
 
+  let d10 = joinB.u;
+  let d11 = joinB.d;
+  let d12 = joinC.u;
+  let d13 = joinC.d;
+  let d14 = joinB.u;
+  let d15 = joinB.u;
+  let d16 = joinB.d;
+  let d17 = joinB.d;
+  let d18 = joinC.u;
+  let d19 = joinC.u;
+  let d20 = joinC.d;
+  let d21 = joinC.d;
+
   // caps l1 these need the check as the angle can still be > 180
-  const d10 = midDirection(joinB.u, joinB.uR);
-  const d11 = midDirection(joinB.dR, joinB.d);
-  const d12 = midDirection(joinC.uL, joinC.u);
-  const d13 = midDirection(joinC.d, joinC.dL);
+  if (joinB.joinUR) {
+    d10 = midDirection(joinB.u, joinB.uR);
+    d14 = midDirectionNoCheck(joinB.u, d10);
+    d15 = midDirectionNoCheck(d10, joinB.uR);
+  }
+  if (joinB.joinDR) {
+    d11 = midDirection(joinB.dR, joinB.d);
+    d16 = midDirectionNoCheck(joinB.dR, d11);
+    d17 = midDirectionNoCheck(d11, joinB.d);
+  }
+  if (joinC.joinUL) {
+    d12 = midDirection(joinC.uL, joinC.u);
+    d18 = midDirectionNoCheck(d12, joinC.u);
+    d19 = midDirectionNoCheck(joinC.uL, d12);
+  }
+  if (joinC.joinDL) {
+    d13 = midDirection(joinC.d, joinC.dL);
+    d20 = midDirectionNoCheck(d13, joinC.dL);
+    d21 = midDirectionNoCheck(joinC.d, d13);
+  }
 
   const v10 = addMul(B.position, d10, B.radius);
   const v11 = addMul(B.position, d11, B.radius);
   const v12 = addMul(C.position, d12, C.radius);
   const v13 = addMul(C.position, d13, C.radius);
-
-  // caps l2
-  const d14 = midDirectionNoCheck(joinB.u, d10);
-  const d15 = midDirectionNoCheck(d10, joinB.uR);
-  const d16 = midDirectionNoCheck(joinB.dR, d11);
-  const d17 = midDirectionNoCheck(d11, joinB.d);
-  const d18 = midDirectionNoCheck(joinC.u, d12);
-  const d19 = midDirectionNoCheck(d12, joinC.uL);
-  const d20 = midDirectionNoCheck(joinC.dL, d13);
-  const d21 = midDirectionNoCheck(d13, joinC.d);
-
   const v14 = addMul(B.position, d14, B.radius);
   const v15 = addMul(B.position, d15, B.radius);
   const v16 = addMul(B.position, d16, B.radius);

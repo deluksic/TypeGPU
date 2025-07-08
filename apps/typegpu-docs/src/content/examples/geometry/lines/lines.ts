@@ -1,5 +1,5 @@
 import tgpu from 'typegpu';
-import { struct, u32, vec2f } from 'typegpu/data';
+import { bool, struct, u32, vec2f } from 'typegpu/data';
 import { add, dot, mul, select, sign } from 'typegpu/std';
 import { cross2d, intersectLines, midDirection, miterPoint } from './utils.ts';
 
@@ -12,6 +12,10 @@ export const JoinResult = struct({
   d: vec2f,
   dR: vec2f,
   situationIndex: u32,
+  joinUL: bool,
+  joinDL: bool,
+  joinUR: bool,
+  joinDR: bool,
 });
 
 export const solveJoin = tgpu.fn(
@@ -54,6 +58,10 @@ export const solveJoin = tgpu.fn(
             dL: nDL,
             d: midD,
             dR: nDR,
+            joinUL: true,
+            joinDL: true,
+            joinUR: true,
+            joinDR: true,
             situationIndex: 0,
           });
         }
@@ -65,6 +73,10 @@ export const solveJoin = tgpu.fn(
           dL: nDL,
           d: midL,
           dR: nDR,
+          joinUL: true,
+          joinDL: true,
+          joinUR: true,
+          joinDR: true,
           situationIndex: 1,
         });
       }
@@ -78,6 +90,10 @@ export const solveJoin = tgpu.fn(
           dL: miterD,
           d: miterD,
           dR: miterD,
+          joinUL: false,
+          joinDL: false,
+          joinUR: false,
+          joinDR: false,
           situationIndex: 2,
         });
       }
@@ -89,6 +105,10 @@ export const solveJoin = tgpu.fn(
         dL: nDL,
         d: midR,
         dR: nDR,
+        joinUL: true,
+        joinDL: true,
+        joinUR: true,
+        joinDR: true,
         situationIndex: 3,
       });
     }
@@ -102,6 +122,10 @@ export const solveJoin = tgpu.fn(
         dL: miterD,
         d: miterD,
         dR: miterD,
+        joinUL: true,
+        joinDL: false,
+        joinUR: true,
+        joinDR: false,
         situationIndex: 4,
       });
     }
@@ -114,6 +138,10 @@ export const solveJoin = tgpu.fn(
       dL: nDL,
       d: midD,
       dR: nDR,
+      joinUL: false,
+      joinDL: true,
+      joinUR: false,
+      joinDR: true,
       situationIndex: 5,
     });
   },
@@ -133,6 +161,10 @@ export const solveCap = tgpu.fn(
       dL: a,
       d: mid,
       dR: b,
+      joinUL: true,
+      joinDL: true,
+      joinUR: true,
+      joinDR: true,
       situationIndex: 0,
     });
   },
