@@ -1,6 +1,6 @@
 import tgpu from 'typegpu';
 import { struct, u32, vec2f } from 'typegpu/data';
-import { dot, select, sign } from 'typegpu/std';
+import { add, dot, mul, select, sign } from 'typegpu/std';
 import { cross2d, intersectLines, midDirection, miterPoint } from './utils.ts';
 
 export const JoinResult = struct({
@@ -27,11 +27,10 @@ export const solveJoin = tgpu.fn(
     const sideUR = sign(xUR - xL);
     const sideDR = sign(xDR - xL);
     const int = intersectLines(nUL, nDL, nUR, nDR);
-    const center = select(
-      vec2f(),
-      int.point,
-      int.valid && int.t >= 0 && int.t <= 1,
-    );
+    let center = mul(add(add(nUL, nUR), add(nDL, nDR)), 0.25);
+    if (int.valid && int.t >= 0 && int.t <= 1) {
+      center = int.point;
+    }
 
     const midU = midDirection(nUL, nUR);
     const midD = midDirection(nDR, nDL);
