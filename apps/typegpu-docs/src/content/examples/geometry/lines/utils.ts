@@ -4,7 +4,6 @@ import {
   add,
   dot,
   length,
-  min,
   mul,
   normalize,
   select,
@@ -12,17 +11,31 @@ import {
   sub,
 } from 'typegpu/std';
 
+export const ortho2d = tgpu.fn([vec2f], vec2f)((v) => {
+  return vec2f(-v.y, v.x);
+});
+
+export const ortho2dNeg = tgpu.fn([vec2f], vec2f)((v) => {
+  return vec2f(v.y, -v.x);
+});
+
 export const cross2d = tgpu.fn([vec2f, vec2f], f32)((a, b) => {
   return a.x * b.y - a.y * b.x;
 });
 
 /**
- * Finds mid direction between two vectors. The direction will always be on the CW part
+ * Finds mid direction between two vectors. The direction will always be on the CW arc
  * between the vectors.
  */
 export const midDirection = tgpu.fn([vec2f, vec2f], vec2f)((a, b) => {
-  const flip = cross2d(a, b) > 0;
-  return mul(normalize(add(a, b)), select(f32(1), f32(-1), flip));
+  const cos = dot(a, b);
+  const sin = cross2d(a, b);
+  // we avoid flicker by allowing almost-colinear vectors be treated as such.
+  const sinSign = select(f32(-1), f32(1), sin < -1e-6);
+  const orthoA = ortho2dNeg(a);
+  const orthoB = ortho2d(b);
+  const dir = select(mul(add(a, b), sinSign), add(orthoA, orthoB), cos < 0);
+  return normalize(dir);
 });
 
 /**
@@ -33,10 +46,11 @@ export const midDirectionNoCheck = tgpu.fn([vec2f, vec2f], vec2f)((a, b) => {
 });
 
 /**
- * Finds miter point given two vectors on a unit circle.
+ * Finds miter point given two vectors on a unit circle. Order of arguments important.
  */
 export const miterPoint = tgpu.fn([vec2f, vec2f], vec2f)((a, b) => {
   if (cross2d(a, b) < 0) {
+    // if the miter is at infinity, just make it super far
     return mul(normalize(add(a, b)), -1e6);
   }
   const ab = add(a, b);
@@ -61,14 +75,6 @@ export const addMul = tgpu.fn(
     return add(a, mul(b, f));
   },
 );
-
-export const ortho2d = tgpu.fn([vec2f], vec2f)((v) => {
-  return vec2f(-v.y, v.x);
-});
-
-export const ortho2dNeg = tgpu.fn([vec2f], vec2f)((v) => {
-  return vec2f(v.y, -v.x);
-});
 
 const ExternalNormals = struct({
   n1: vec2f,
@@ -131,7 +137,3 @@ export const intersectLines = tgpu.fn(
     };
   },
 );
-
-export const clampLength = tgpu.fn([vec2f, f32], vec2f)((v, maxLength) => {
-  return mul(normalize(v), min(length(v), maxLength));
-});
