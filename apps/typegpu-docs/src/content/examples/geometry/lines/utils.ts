@@ -8,7 +8,6 @@ import {
   mul,
   normalize,
   select,
-  sign,
   sqrt,
   sub,
 } from 'typegpu/std';
@@ -22,7 +21,15 @@ export const cross2d = tgpu.fn([vec2f, vec2f], f32)((a, b) => {
  * between the vectors.
  */
 export const midDirection = tgpu.fn([vec2f, vec2f], vec2f)((a, b) => {
-  return mul(normalize(add(a, b)), -sign(cross2d(a, b)));
+  const flip = cross2d(a, b) > 0;
+  return mul(normalize(add(a, b)), select(f32(1), f32(-1), flip));
+});
+
+/**
+ * Finds mid direction between two vectors. There is no check done to be on the CW part.
+ */
+export const midDirectionNoCheck = tgpu.fn([vec2f, vec2f], vec2f)((a, b) => {
+  return normalize(add(a, b));
 });
 
 /**
