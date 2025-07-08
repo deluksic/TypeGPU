@@ -118,3 +118,22 @@ export const solveJoin = tgpu.fn(
     });
   },
 );
+
+export const solveCap = tgpu.fn(
+  [vec2f, vec2f],
+  JoinResult,
+)(
+  (a, b) => {
+    const mid = midDirection(b, a);
+    return JoinResult({
+      uL: b,
+      u: mid,
+      uR: a,
+      c: mid,
+      dL: a,
+      d: mid,
+      dR: b,
+      situationIndex: 0,
+    });
+  },
+);
