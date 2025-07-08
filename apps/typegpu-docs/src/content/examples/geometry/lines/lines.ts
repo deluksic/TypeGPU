@@ -35,6 +35,7 @@ export const solveJoin = tgpu.fn(
     const midU = midDirection(nUL, nUR);
     const midD = midDirection(nDR, nDL);
     const midR = midDirection(nDR, nUR);
+    const midL = midDirection(nUL, nDL);
     const miterU = miterPoint(nUL, nUR);
     const miterD = miterPoint(nDR, nDL);
 
@@ -58,11 +59,11 @@ export const solveJoin = tgpu.fn(
         }
         return JoinResult({
           uL: nUL,
-          u: midR,
+          u: midL,
           uR: nUR,
-          c: midR,
+          c: midL,
           dL: nDL,
-          d: midR,
+          d: midL,
           dR: nDR,
           situationIndex: 1,
         });
@@ -73,7 +74,7 @@ export const solveJoin = tgpu.fn(
           uL: miterU,
           u: miterU,
           uR: miterU,
-          c: miterU, // remove inner triangle
+          c: mul(add(miterU, miterD), 0.5), // remove inner triangle
           dL: miterD,
           d: miterD,
           dR: miterD,
