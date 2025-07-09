@@ -67,11 +67,11 @@ export const solveJoin = tgpu.fn(
         }
         return JoinResult({
           uL: nUL,
-          u: midL,
+          u: midR,
           uR: nUR,
-          c: midL,
+          c: midR,
           dL: nDL,
-          d: midL,
+          d: midR,
           dR: nDR,
           joinUL: true,
           joinDL: true,
@@ -99,11 +99,11 @@ export const solveJoin = tgpu.fn(
       }
       return JoinResult({
         uL: nUL,
-        u: midR,
+        u: midL,
         uR: nUR,
-        c: midR,
+        c: midL,
         dL: nDL,
-        d: midR,
+        d: midL,
         dR: nDR,
         joinUL: true,
         joinDL: true,

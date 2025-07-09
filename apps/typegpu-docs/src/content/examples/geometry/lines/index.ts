@@ -2,12 +2,14 @@ import tgpu from 'typegpu';
 import * as d from 'typegpu/data';
 import type { ColorAttachment } from '../../../../../../../packages/typegpu/src/core/pipeline/renderPipeline.ts';
 import {
+  add,
   arrayLength,
   clamp,
   cos,
   dot,
   max,
   min,
+  mul,
   normalize,
   select,
   sin,
@@ -17,13 +19,21 @@ import {
   addMul,
   externalNormals,
   limitAlong,
+  limitTowardsMiddle,
   midDirection,
   midDirectionNoCheck,
   ortho2d,
   ortho2dNeg,
 } from './utils.ts';
 import { solveCap, solveJoin } from './lines.ts';
-import { indicesCapLevel2, outlineIndicesCapLevel2 } from './indices.ts';
+import {
+  indices,
+  indicesCapLevel1,
+  indicesCapLevel2,
+  outlineIndices,
+  outlineIndicesCapLevel1,
+  outlineIndicesCapLevel2,
+} from './indices.ts';
 
 const presentationFormat = navigator.gpu.getPreferredCanvasFormat();
 const canvas = document.querySelector('canvas');
@@ -103,7 +113,7 @@ const lineVertices = [
     radius: 0.2,
   }),
   LineVertex({
-    position: d.vec2f(0.4, 0.4),
+    position: d.vec2f(0.2, 0.3),
     radius: 0.05,
   }),
 ];
@@ -199,22 +209,25 @@ const mainVertex = tgpu['~unstable'].vertexFn({
   const tBC1 = ortho2d(eBC.n1);
   const tBC2 = ortho2dNeg(eBC.n2);
 
-  if (!isCapB) {
-    const limB1 = addMul(C.position, eBC.n1, C.radius);
-    const limB2 = addMul(C.position, eBC.n2, C.radius);
-    v0 = limitAlong(v0, limB1, tBC1, false);
-    v1 = limitAlong(v1, limB1, tBC1, false);
-    v3 = limitAlong(v3, limB2, tBC2, false);
-    v4 = limitAlong(v4, limB2, tBC2, false);
-  }
+  const mid = mul(0.5, add(B.position, C.position));
+  const lim16 = limitTowardsMiddle(tBC1, mid, v1, v6);
+  v1 = lim16.a;
+  v6 = lim16.b;
+  const lim38 = limitTowardsMiddle(tBC2, mid, v3, v8);
+  v3 = lim38.a;
+  v8 = lim38.b;
 
-  if (!isCapC) {
-    const limC1 = addMul(B.position, eBC.n1, B.radius);
-    const limC2 = addMul(B.position, eBC.n2, B.radius);
-    v5 = limitAlong(v5, limC1, tBC1, true);
-    v6 = limitAlong(v6, limC1, tBC1, true);
-    v8 = limitAlong(v8, limC2, tBC2, true);
-    v9 = limitAlong(v9, limC2, tBC2, true);
+  if (!joinB.joinUR) {
+    v0 = v1;
+  }
+  if (!joinB.joinDR) {
+    v4 = v3;
+  }
+  if (!joinC.joinUL) {
+    v5 = v6;
+  }
+  if (!joinC.joinDL) {
+    v9 = v8;
   }
 
   let d10 = joinB.u;
@@ -407,12 +420,12 @@ const draw = () => {
   pipeline
     .with(bindGroupLayout, uniformsBindGroup)
     .withColorAttachment({ ...colorAttachment, loadOp: 'clear' })
-    .drawIndexed(indicesCapLevel2.length, 4);
+    .drawIndexed(indices.length, 4);
 
   outlinePipeline
     .with(bindGroupLayout, uniformsBindGroup)
     .withColorAttachment(colorAttachment)
-    .drawIndexed(outlineIndicesCapLevel2.length, 4);
+    .drawIndexed(outlineIndices.length, 4);
 
   circlesPipeline
     .with(bindGroupLayout, uniformsBindGroup)
