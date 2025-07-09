@@ -1,6 +1,7 @@
 import tgpu from 'typegpu';
 import { bool, f32, struct, vec2f } from 'typegpu/data';
 import {
+  abs,
   add,
   dot,
   length,
@@ -111,6 +112,31 @@ export const limitAlong = tgpu.fn([vec2f, vec2f, vec2f, bool], vec2f)(
     const dotA = dot(a, dir);
     const dotB = dot(b, dir);
     return select(a, b, (dotA >= dotB) === invert);
+  },
+);
+
+const LimitAlongResult = struct({
+  a: vec2f,
+  b: vec2f,
+});
+
+/**
+ * Leaves a and b separate if no collision, otherwise merges them towards "middle".
+ */
+export const limitTowardsMiddle = tgpu.fn(
+  [vec2f, vec2f, vec2f, vec2f],
+  LimitAlongResult,
+)(
+  (dir, middle, a, b) => {
+    const aX = dot(a, dir);
+    const bX = dot(b, dir);
+    if (aX >= bX) {
+      // a is in front of b, don't touch them
+      return LimitAlongResult({ a, b });
+    }
+    const middleX = dot(middle, dir);
+    const same = select(a, b, abs(aX - middleX) > abs(bX - middleX));
+    return LimitAlongResult({ a: same, b: same });
   },
 );
 
