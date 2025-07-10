@@ -31,8 +31,7 @@ export const cross2d = tgpu.fn([vec2f, vec2f], f32)((a, b) => {
 export const midDirection = tgpu.fn([vec2f, vec2f], vec2f)((a, b) => {
   const cos = dot(a, b);
   const sin = cross2d(a, b);
-  // we avoid flicker by allowing almost-colinear vectors be treated as such.
-  const sinSign = select(f32(-1), f32(1), sin < -1e-6);
+  const sinSign = select(f32(-1), f32(1), sin < 0);
   const orthoA = ortho2dNeg(a);
   const orthoB = ortho2d(b);
   const dir = select(mul(add(a, b), sinSign), add(orthoA, orthoB), cos < 0);

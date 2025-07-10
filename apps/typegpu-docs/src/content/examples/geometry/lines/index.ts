@@ -18,7 +18,6 @@ import {
 import {
   addMul,
   externalNormals,
-  limitAlong,
   limitTowardsMiddle,
   midDirection,
   midDirectionNoCheck,
@@ -147,6 +146,12 @@ const mainVertex = tgpu['~unstable'].vertexFn({
     instanceIndex: d.interpolate('flat', d.u32),
   },
 })(({ vertexIndex, instanceIndex }) => {
+  // if (instanceIndex !== 2) {
+  //   return {
+  //     outPos: d.vec4f(),
+  //     instanceIndex: 0,
+  //   };
+  // }
   const firstIndex = max(0, d.i32(instanceIndex) - 1);
   const lastIndex = min(
     arrayLength(bindGroupLayout.$.lineVertices) - 1,
@@ -191,7 +196,7 @@ const mainVertex = tgpu['~unstable'].vertexFn({
 
   let v0 = addMul(B.position, joinB.u, B.radius);
   let v1 = addMul(B.position, joinB.uR, B.radius);
-  const v2 = addMul(B.position, joinB.c, B.radius);
+  let v2 = addMul(B.position, joinB.c, B.radius);
   let v3 = addMul(B.position, joinB.dR, B.radius);
   let v4 = addMul(B.position, joinB.d, B.radius);
 
@@ -202,7 +207,7 @@ const mainVertex = tgpu['~unstable'].vertexFn({
 
   let v5 = addMul(C.position, joinC.u, C.radius);
   let v6 = addMul(C.position, joinC.uL, C.radius);
-  const v7 = addMul(C.position, joinC.c, C.radius);
+  let v7 = addMul(C.position, joinC.c, C.radius);
   let v8 = addMul(C.position, joinC.dL, C.radius);
   let v9 = addMul(C.position, joinC.d, C.radius);
 
@@ -228,6 +233,14 @@ const mainVertex = tgpu['~unstable'].vertexFn({
   }
   if (!joinC.joinDL) {
     v9 = v8;
+  }
+  if (joinB.situationIndex === 2) {
+    // remove central triangle but only after limits are applied
+    v2 = v1;
+  }
+  if (joinC.situationIndex === 2) {
+    // remove central triangle but only after limits are applied
+    v7 = v6;
   }
 
   let d10 = joinB.u;
