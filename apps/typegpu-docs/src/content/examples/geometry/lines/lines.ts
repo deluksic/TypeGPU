@@ -86,7 +86,7 @@ export const solveJoin = tgpu.fn(
           uL: miterU,
           u: miterU,
           uR: miterU,
-          c: mul(add(miterU, miterD), 0.5), // remove inner triangle
+          c: center,
           dL: miterD,
           d: miterD,
           dR: miterD,
