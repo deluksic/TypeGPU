@@ -45,6 +45,10 @@ export const midDirectionNoCheck = tgpu.fn([vec2f, vec2f], vec2f)((a, b) => {
   return normalize(add(a, b));
 });
 
+export const midPoint = tgpu.fn([vec2f, vec2f], vec2f)((a, b) => {
+  return mul(0.5, add(a, b));
+});
+
 /**
  * Finds miter point given two vectors on a unit circle. Order of arguments important.
  */
