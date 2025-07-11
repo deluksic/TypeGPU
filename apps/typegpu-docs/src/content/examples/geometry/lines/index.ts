@@ -100,14 +100,14 @@ const lineVertices = [
   }),
   LineVertex({
     position: d.vec2f(-0.4, 0),
-    radius: 0.05,
+    radius: 0.2,
   }),
   LineVertex({
     position: d.vec2f(-0.2, 0),
-    radius: 0.1,
+    radius: 0.2,
   }),
   LineVertex({
-    position: d.vec2f(0.6, 0),
+    position: d.vec2f(0.6, -0.2),
     radius: 0.1,
   }),
   LineVertex({

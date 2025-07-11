@@ -1,7 +1,13 @@
 import tgpu from 'typegpu';
 import { bool, struct, u32, vec2f } from 'typegpu/data';
 import { add, dot, mul, select, sign } from 'typegpu/std';
-import { cross2d, intersectLines, midDirection, miterPoint } from './utils.ts';
+import {
+  cross2d,
+  intersectLines,
+  midDirection,
+  midPoint,
+  miterPoint,
+} from './utils.ts';
 
 const JOIN_LIMIT = 0.99;
 
@@ -32,11 +38,11 @@ export const solveJoin = tgpu.fn(
     const yDR = cross2d(nL, nDR);
     const sideUR = sign(xUR - xL);
     const sideDR = sign(xDR - xL);
-    const int = intersectLines(nUL, nDL, nUR, nDR);
-    let center = mul(add(add(nUL, nUR), add(nDL, nDR)), 0.25);
-    if (int.valid && int.t >= 0 && int.t <= 1) {
-      center = int.point;
-    }
+    const center = mul(add(add(nUL, nUR), add(nDL, nDR)), 0.25);
+    // const int = intersectLines(nUL, nDL, nUR, nDR);
+    // if (int.valid && int.t >= 0 && int.t <= 1) {
+    //   center = int.point;
+    // }
 
     const midU = midDirection(nUL, nUR);
     const midD = midDirection(nDR, nDL);
@@ -47,6 +53,8 @@ export const solveJoin = tgpu.fn(
 
     const joinU = dot(nUL, nUR) < JOIN_LIMIT;
     const joinD = dot(nDL, nDR) < JOIN_LIMIT;
+    const midpU = midPoint(nUL, nUR);
+    const midpD = midPoint(nDL, nDR);
 
     if (sideUR === sideDR) {
       const side = sideUR;
@@ -56,13 +64,13 @@ export const solveJoin = tgpu.fn(
       if (side >= 0) {
         if (clockWise) {
           return JoinResult({
-            uL: select(midU, nUL, joinU),
-            u: select(midU, midU, joinU),
-            uR: select(midU, nUR, joinU),
+            uL: select(midpU, nUL, joinU),
+            u: select(midpU, midU, joinU),
+            uR: select(midpU, nUR, joinU),
             c: center,
-            dL: select(midD, nDL, joinD),
-            d: select(midD, midD, joinD),
-            dR: select(midD, nDR, joinD),
+            dL: select(midpD, nDL, joinD),
+            d: select(midpD, midD, joinD),
+            dR: select(midpD, nDR, joinD),
             joinUL: joinU,
             joinUR: joinU,
             joinDL: joinD,
@@ -120,9 +128,9 @@ export const solveJoin = tgpu.fn(
 
     if (sideUR >= 0) {
       return JoinResult({
-        uL: select(midU, nUL, joinU),
-        u: select(midU, midU, joinU),
-        uR: select(midU, nUR, joinU),
+        uL: select(midpU, nUL, joinU),
+        u: select(midpU, midU, joinU),
+        uR: select(midpU, nUR, joinU),
         c: center,
         dL: miterD,
         d: miterD,
@@ -140,9 +148,9 @@ export const solveJoin = tgpu.fn(
       u: miterU,
       uR: miterU,
       c: center,
-      dL: select(midD, nDL, joinD),
-      d: select(midD, midD, joinD),
-      dR: select(midD, nDR, joinD),
+      dL: select(midpD, nDL, joinD),
+      d: select(midpD, midD, joinD),
+      dR: select(midpD, nDR, joinD),
       joinUL: false,
       joinUR: false,
       joinDL: joinD,
