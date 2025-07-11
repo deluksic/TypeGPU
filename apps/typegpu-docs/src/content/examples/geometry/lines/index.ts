@@ -2,14 +2,12 @@ import tgpu from 'typegpu';
 import * as d from 'typegpu/data';
 import type { ColorAttachment } from '../../../../../../../packages/typegpu/src/core/pipeline/renderPipeline.ts';
 import {
-  add,
   arrayLength,
   clamp,
   cos,
   dot,
   max,
   min,
-  mul,
   normalize,
   select,
   sin,
@@ -21,6 +19,7 @@ import {
   limitTowardsMiddle,
   midDirection,
   midDirectionNoCheck,
+  midPoint,
   ortho2d,
   ortho2dNeg,
 } from './utils.ts';
@@ -96,12 +95,12 @@ const bindGroupLayout = tgpu.bindGroupLayout({
 
 const lineVertices = [
   LineVertex({
-    position: d.vec2f(-0.55, 0),
-    radius: 0.05,
+    position: d.vec2f(-0.6, 0),
+    radius: 0.1,
   }),
   LineVertex({
     position: d.vec2f(-0.4, 0),
-    radius: 0.25,
+    radius: 0.05,
   }),
   LineVertex({
     position: d.vec2f(-0.2, 0),
@@ -109,11 +108,11 @@ const lineVertices = [
   }),
   LineVertex({
     position: d.vec2f(0.6, 0),
-    radius: 0.2,
+    radius: 0.1,
   }),
   LineVertex({
     position: d.vec2f(0.2, 0.3),
-    radius: 0.05,
+    radius: 0.1,
   }),
 ];
 const lineVerticesBuffer = root.createBuffer(
@@ -214,7 +213,7 @@ const mainVertex = tgpu['~unstable'].vertexFn({
   const tBC1 = ortho2d(eBC.n1);
   const tBC2 = ortho2dNeg(eBC.n2);
 
-  const mid = mul(0.5, add(B.position, C.position));
+  const mid = midPoint(B.position, C.position);
   const lim16 = limitTowardsMiddle(tBC1, mid, v1, v6);
   v1 = lim16.a;
   v6 = lim16.b;
@@ -256,7 +255,6 @@ const mainVertex = tgpu['~unstable'].vertexFn({
   let d20 = joinC.d;
   let d21 = joinC.d;
 
-  // caps l1 these need the check as the angle can still be > 180
   if (joinB.joinUR) {
     d10 = midDirection(joinB.u, joinB.uR);
     d14 = midDirectionNoCheck(joinB.u, d10);
@@ -433,12 +431,12 @@ const draw = () => {
   pipeline
     .with(bindGroupLayout, uniformsBindGroup)
     .withColorAttachment({ ...colorAttachment, loadOp: 'clear' })
-    .drawIndexed(indices.length, 4);
+    .drawIndexed(indicesCapLevel1.length, 4);
 
   outlinePipeline
     .with(bindGroupLayout, uniformsBindGroup)
     .withColorAttachment(colorAttachment)
-    .drawIndexed(outlineIndices.length, 4);
+    .drawIndexed(outlineIndicesCapLevel1.length, 4);
 
   circlesPipeline
     .with(bindGroupLayout, uniformsBindGroup)
