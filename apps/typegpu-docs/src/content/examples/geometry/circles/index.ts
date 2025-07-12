@@ -2,11 +2,7 @@ import tgpu from 'typegpu';
 import * as d from 'typegpu/data';
 import * as s from 'typegpu/std';
 
-import {
-  circleFan,
-  circleMaxArea,
-  circleMaxAreaVertexCount,
-} from '@typegpu/geometry';
+import { circle, circleVertexCount } from '@typegpu/geometry';
 
 const presentationFormat = navigator.gpu.getPreferredCanvasFormat();
 const canvas = document.querySelector('canvas');
@@ -104,38 +100,15 @@ const mainVertexMaxArea = tgpu['~unstable'].vertexFn({
     instanceIndex: d.interpolate('flat', d.u32),
   },
 })(({ vertexIndex, instanceIndex }) => {
-  const circle = bindGroupLayout.$.circles[instanceIndex];
-  const unit = circleMaxArea(vertexIndex);
-  const pos = s.add(circle.position, s.mul(unit, circle.radius));
+  const C = bindGroupLayout.$.circles[instanceIndex];
+  const unit = circle(vertexIndex);
+  const pos = s.add(C.position, s.mul(unit, C.radius));
   return {
     outPos: d.vec4f(pos, 0.0, 1.0),
     uv: unit,
     instanceIndex,
   };
 });
-
-const mainVertexFan = tgpu['~unstable'].vertexFn({
-  in: {
-    instanceIndex: d.builtin.instanceIndex,
-    vertexIndex: d.builtin.vertexIndex,
-  },
-  out: {
-    outPos: d.builtin.position,
-    uv: d.vec2f,
-    instanceIndex: d.interpolate('flat', d.u32),
-  },
-})(({ vertexIndex, instanceIndex }) => {
-  const circle = bindGroupLayout.$.circles[instanceIndex];
-  const unit = circleFan(vertexIndex, 10);
-  const pos = s.add(circle.position, s.mul(unit, circle.radius));
-  return {
-    outPos: d.vec4f(pos, 0.0, 1.0),
-    uv: unit,
-    instanceIndex,
-  };
-});
-
-console.log(tgpu.resolve({ externals: { mainVertexFan } }));
 
 const mainFragment = tgpu['~unstable'].fragmentFn({
   in: {
@@ -181,7 +154,7 @@ setTimeout(() => {
     .withPerformanceCallback((a, b) => {
       console.log((Number(b - a) * 1e-6).toFixed(3), 'ms');
     })
-    .draw(circleMaxAreaVertexCount(4), circleCount);
+    .draw(circleVertexCount(4), circleCount);
 }, 100);
 
 export function onCleanup() {
