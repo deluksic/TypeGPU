@@ -11,7 +11,7 @@ const SubdivLevelResult = struct({
   vertexIndexInLevel: u32,
 });
 
-const getSubdivLevel = tgpu['~unstable'].fn([u32], SubdivLevelResult)(
+const getSubdivLevel = tgpu.fn([u32], SubdivLevelResult)(
   (vertexIndex) => {
     let totalVertexCount = u32(0);
     for (let level = u32(0); level < 8; level += 1) {
@@ -43,11 +43,9 @@ const getSubdivLevel = tgpu['~unstable'].fn([u32], SubdivLevelResult)(
   },
 );
 
-const consecutiveTriangleVertexIndex = tgpu['~unstable'].fn([u32], u32)(
-  (i) => {
-    return (2 * (i + 1)) / 3;
-  },
-);
+const consecutiveTriangleVertexIndex = tgpu.fn([u32], u32)((i) => {
+  return (2 * (i + 1)) / 3;
+});
 
 /**
  * Given a `vertexIndex`, returns the unit vector which can be
@@ -59,7 +57,7 @@ const consecutiveTriangleVertexIndex = tgpu['~unstable'].fn([u32], u32)(
  * more performant than `circleFan` due to less overdraw.
  * For more information, see https://www.humus.name/index.php?page=News&ID=228
  */
-export const circleMaxArea = tgpu['~unstable'].fn([u32], vec2f)(
+export const circle = tgpu.fn([u32], vec2f)(
   (vertexIndex) => {
     const subdiv = getSubdivLevel(vertexIndex);
     const i = consecutiveTriangleVertexIndex(subdiv.vertexIndexInLevel);
@@ -69,30 +67,10 @@ export const circleMaxArea = tgpu['~unstable'].fn([u32], vec2f)(
   },
 );
 
-export function circleMaxAreaVertexCount(subdivLevel: number) {
+export function circleVertexCount(subdivLevel: number) {
   let totalVertexCount = 3;
   for (let level = 0; level < subdivLevel; level += 1) {
     totalVertexCount += 9 * (1 << level);
   }
   return totalVertexCount;
 }
-
-/**
- * Given a `vertexIndex`, returns the unit vector which can be
- * added to the circle center and scaled using radius.
- * Render using triangle list.
- * Once you decide on `triangleCount`,
- * number of vertices to render is `triangleCount * 3`.
- */
-export const circleFan = tgpu['~unstable'].fn([u32, u32], vec2f)(
-  (vertexIndex, triangleCount) => {
-    const triangleIndex = vertexIndex / 3;
-    const vertexInTriangle = vertexIndex % 3;
-    if (vertexInTriangle === 2) {
-      return vec2f(0, 0);
-    }
-    const i = triangleIndex + vertexInTriangle;
-    const angle = 2 * PI.$ * f32(i) / f32(triangleCount);
-    return vec2f(cos(angle), sin(angle));
-  },
-);
