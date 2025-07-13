@@ -1,17 +1,34 @@
 import tgpu from 'typegpu';
 import { bool, f32, struct, vec2f } from 'typegpu/data';
 import {
+  add,
   clamp,
   distance,
   dot,
   length,
   mix,
+  mul,
   normalize,
   select,
   sqrt,
   sub,
 } from 'typegpu/std';
-import { addMul } from '../utils.ts';
+import { addMul, bisectCcw, cross2d } from '../utils.ts';
+
+/**
+ * Finds the miter point of tangents to two points on a unit circle (vectors must be unit!).
+ * The miter point is on the counter-clockwise arc between the circles if possible,
+ * otherwise at "infinity".
+ */
+export const miterPoint = tgpu.fn([vec2f, vec2f], vec2f)((a, b) => {
+  if (cross2d(a, b) < 0) {
+    // if the miter is at infinity, just make it super far
+    return mul(bisectCcw(a, b), -1e6);
+  }
+  const ab = add(a, b);
+  const len2 = dot(ab, ab);
+  return mul(ab, 2 / len2);
+});
 
 const ExternalNormals = struct({
   n1: vec2f,

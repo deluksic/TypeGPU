@@ -4,15 +4,14 @@ import type { v2f } from 'typegpu/data';
 import { add, dot, mul, normalize, select, sub } from 'typegpu/std';
 import {
   addMul,
-  bisect,
+  bisectCcw,
   bisectNoCheck,
   cross2d,
   midPoint,
-  miterPoint,
   rot90ccw,
   rot90cw,
 } from '../utils.ts';
-import { externalNormals, limitTowardsMiddle } from './utils.ts';
+import { externalNormals, limitTowardsMiddle, miterPoint } from './utils.ts';
 
 const JOIN_LIMIT = tgpu['~unstable'].const(f32, 0.99);
 
@@ -45,10 +44,10 @@ const solveJoin = tgpu.fn(
     const sideDR = select(f32(-1), f32(1), xDR - xL >= 0);
     const center = mul(add(add(nUL, nUR), add(nDL, nDR)), 0.25);
 
-    const midU = bisect(nUR, nUL);
-    const midD = bisect(nDL, nDR);
-    const midR = bisect(nUR, nDR);
-    const midL = bisect(nDL, nUL);
+    const midU = bisectCcw(nUR, nUL);
+    const midD = bisectCcw(nDL, nDR);
+    const midR = bisectCcw(nUR, nDR);
+    const midL = bisectCcw(nDL, nUL);
     const miterU = miterPoint(nUL, nUR);
     const miterD = miterPoint(nDR, nDL);
 
@@ -161,12 +160,143 @@ const solveJoin = tgpu.fn(
   },
 );
 
+const solveMiterJoin = tgpu.fn(
+  [vec2f, vec2f, vec2f, vec2f, vec2f],
+  JoinResult,
+)(
+  (nL, nUL, nUR, nDL, nDR) => {
+    const xL = dot(nL, nUL); // == dot(nL, nDL)
+    const xUR = dot(nL, nUR);
+    const xDR = dot(nL, nDR);
+    const yUR = cross2d(nL, nUR);
+    const yDR = cross2d(nL, nDR);
+    const sideUR = select(f32(-1), f32(1), xUR - xL >= 0);
+    const sideDR = select(f32(-1), f32(1), xDR - xL >= 0);
+    const center = mul(add(add(nUL, nUR), add(nDL, nDR)), 0.25);
+
+    const midU = bisectCcw(nUR, nUL);
+    const midD = bisectCcw(nDL, nDR);
+    const midR = bisectCcw(nUR, nDR);
+    const midL = bisectCcw(nDL, nUL);
+    const miterU = miterPoint(nUL, nUR);
+    const miterD = miterPoint(nDR, nDL);
+
+    const miterUU = miterPoint(nUR, nUL);
+    const miterDD = miterPoint(nDL, nDR);
+
+    const joinU = dot(nUL, nUR) < JOIN_LIMIT.$;
+    const joinD = dot(nDL, nDR) < JOIN_LIMIT.$;
+
+    if (sideUR === sideDR) {
+      const side = sideUR;
+      const XUR = select(xUR, side * 2 - xUR, yUR < 0);
+      const XDR = select(xDR, side * 2 - xDR, yDR < 0);
+      const clockWise = (side * (XUR - XDR)) <= 0;
+      if (side === 1) {
+        if (clockWise) {
+          return JoinResult({
+            uL: miterUU,
+            u: miterUU,
+            uR: miterUU,
+            c: center,
+            dL: miterDD,
+            d: miterDD,
+            dR: miterDD,
+            joinUL: joinU,
+            joinUR: joinU,
+            joinDL: joinD,
+            joinDR: joinD,
+            situationIndex: 0,
+          });
+        }
+        return JoinResult({
+          uL: nUL,
+          u: midR,
+          uR: nUR,
+          c: midR,
+          dL: nDL,
+          d: midR,
+          dR: nDR,
+          joinUL: true,
+          joinUR: true,
+          joinDL: true,
+          joinDR: true,
+          situationIndex: 1,
+        });
+      }
+      // side == -1
+      if (clockWise) {
+        return JoinResult({
+          uL: miterU,
+          u: miterU,
+          uR: miterU,
+          c: center,
+          dL: miterD,
+          d: miterD,
+          dR: miterD,
+          joinUL: false,
+          joinUR: false,
+          joinDL: false,
+          joinDR: false,
+          situationIndex: 2,
+        });
+      }
+      return JoinResult({
+        uL: nUL,
+        u: midL,
+        uR: nUR,
+        c: midL,
+        dL: nDL,
+        d: midL,
+        dR: nDR,
+        joinUL: true,
+        joinUR: true,
+        joinDL: true,
+        joinDR: true,
+        situationIndex: 3,
+      });
+    }
+
+    if (sideUR === 1) {
+      return JoinResult({
+        uL: miterUU,
+        u: miterUU,
+        uR: miterUU,
+        c: center,
+        dL: miterD,
+        d: miterD,
+        dR: miterD,
+        joinUL: joinU,
+        joinUR: joinU,
+        joinDL: false,
+        joinDR: false,
+        situationIndex: 4,
+      });
+    }
+
+    return JoinResult({
+      uL: miterU,
+      u: miterU,
+      uR: miterU,
+      c: center,
+      dL: miterDD,
+      d: miterDD,
+      dR: miterDD,
+      joinUL: false,
+      joinUR: false,
+      joinDL: joinD,
+      joinDR: joinD,
+      situationIndex: 5,
+    });
+  },
+);
+
 const solveCap = tgpu.fn(
   [vec2f, vec2f],
   JoinResult,
 )(
   (a, b) => {
-    const mid = bisect(a, b);
+    const mid = bisectCcw(a, b);
     return JoinResult({
       uL: b,
       u: mid,
@@ -231,7 +361,7 @@ export const lineSegmentVariableWidth = tgpu.fn([
 
   let joinB = solveCap(eBC.n1, eBC.n2);
   if (!isCapB) {
-    joinB = solveJoin(nAB, eAB.n1, eBC.n1, eAB.n2, eBC.n2);
+    joinB = solveMiterJoin(nAB, eAB.n1, eBC.n1, eAB.n2, eBC.n2);
   }
 
   let v0 = addMul(B.position, joinB.u, B.radius);
@@ -242,7 +372,7 @@ export const lineSegmentVariableWidth = tgpu.fn([
 
   let joinC = solveCap(eBC.n2, eBC.n1);
   if (!isCapC) {
-    joinC = solveJoin(nBC, eBC.n1, eCD.n1, eBC.n2, eCD.n2);
+    joinC = solveMiterJoin(nBC, eBC.n1, eCD.n1, eBC.n2, eCD.n2);
   }
 
   let v5 = addMul(C.position, joinC.u, C.radius);
@@ -297,22 +427,22 @@ export const lineSegmentVariableWidth = tgpu.fn([
   let d21 = joinC.d;
 
   if (joinB.joinUR) {
-    d10 = bisect(joinB.uR, joinB.u);
+    d10 = bisectCcw(joinB.uR, joinB.u);
     d14 = bisectNoCheck(d10, joinB.u);
     d15 = bisectNoCheck(joinB.uR, d10);
   }
   if (joinB.joinDR) {
-    d11 = bisect(joinB.d, joinB.dR);
+    d11 = bisectCcw(joinB.d, joinB.dR);
     d16 = bisectNoCheck(d11, joinB.dR);
     d17 = bisectNoCheck(joinB.d, d11);
   }
   if (joinC.joinUL) {
-    d12 = bisect(joinC.u, joinC.uL);
+    d12 = bisectCcw(joinC.u, joinC.uL);
     d18 = bisectNoCheck(joinC.u, d12);
     d19 = bisectNoCheck(d12, joinC.uL);
   }
   if (joinC.joinDL) {
-    d13 = bisect(joinC.dL, joinC.d);
+    d13 = bisectCcw(joinC.dL, joinC.d);
     d20 = bisectNoCheck(joinC.dL, d13);
     d21 = bisectNoCheck(d13, joinC.d);
   }
@@ -375,22 +505,22 @@ export const lineSingleSegmentVariableWidth = tgpu.fn([
   let d21 = joinB.d;
 
   if (joinA.joinUR) {
-    d10 = bisect(joinA.uR, joinA.u);
+    d10 = bisectCcw(joinA.uR, joinA.u);
     d14 = bisectNoCheck(d10, joinA.u);
     d15 = bisectNoCheck(joinA.uR, d10);
   }
   if (joinA.joinDR) {
-    d11 = bisect(joinA.d, joinA.dR);
+    d11 = bisectCcw(joinA.d, joinA.dR);
     d16 = bisectNoCheck(d11, joinA.dR);
     d17 = bisectNoCheck(joinA.d, d11);
   }
   if (joinB.joinUL) {
-    d12 = bisect(joinB.u, joinB.uL);
+    d12 = bisectCcw(joinB.u, joinB.uL);
     d18 = bisectNoCheck(joinB.u, d12);
     d19 = bisectNoCheck(d12, joinB.uL);
   }
   if (joinB.joinDL) {
-    d13 = bisect(joinB.dL, joinB.d);
+    d13 = bisectCcw(joinB.dL, joinB.d);
     d20 = bisectNoCheck(joinB.dL, d13);
     d21 = bisectNoCheck(d13, joinB.d);
   }

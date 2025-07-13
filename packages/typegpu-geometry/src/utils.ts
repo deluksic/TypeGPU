@@ -30,7 +30,7 @@ export const cross2d = tgpu.fn([vec2f, vec2f], f32)((a, b) => {
  * The direction will always be on the counter-clockwise arc between the vectors,
  * so vector order is important.
  */
-export const bisect = tgpu.fn([vec2f, vec2f], vec2f)((a, b) => {
+export const bisectCcw = tgpu.fn([vec2f, vec2f], vec2f)((a, b) => {
   const sin = cross2d(a, b);
   const sinSign = select(f32(-1), f32(1), sin >= 0);
   const orthoA = rot90ccw(a);
@@ -54,19 +54,4 @@ export const bisectNoCheck = tgpu.fn([vec2f, vec2f], vec2f)((a, b) => {
 
 export const midPoint = tgpu.fn([vec2f, vec2f], vec2f)((a, b) => {
   return mul(0.5, add(a, b));
-});
-
-/**
- * Finds the miter point of tangents to two points on a unit circle (vectors must be unit!).
- * The miter point is on the counter-clockwise arc between the circles if possible,
- * otherwise at "infinity".
- */
-export const miterPoint = tgpu.fn([vec2f, vec2f], vec2f)((a, b) => {
-  if (cross2d(a, b) < 0) {
-    // if the miter is at infinity, just make it super far
-    return mul(normalize(add(a, b)), -1e6);
-  }
-  const ab = add(a, b);
-  const len2 = dot(ab, ab);
-  return mul(ab, 2 / len2);
 });
