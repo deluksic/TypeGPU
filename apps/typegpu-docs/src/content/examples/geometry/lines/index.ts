@@ -8,6 +8,7 @@ import {
   lineSegmentVariableWidth,
   LineSegmentVertex,
   lineSegmentWireframeIndicesCapLevel2,
+  lineSingleSegmentVariableWidth,
 } from '@typegpu/geometry';
 import { addMul } from '../../../../../../../packages/typegpu-geometry/src/utils.ts';
 
@@ -84,11 +85,11 @@ const lineVertices = [
   }),
   LineSegmentVertex({
     position: d.vec2f(-0.4, 0),
-    radius: 0.2,
+    radius: 0.25,
   }),
   LineSegmentVertex({
     position: d.vec2f(-0.2, 0),
-    radius: 0.2,
+    radius: 0.1,
   }),
   LineSegmentVertex({
     position: d.vec2f(0.6, -0.2),
@@ -120,24 +121,24 @@ const outlineIndexBuffer = root.createBuffer(
   lineSegmentWireframeIndicesCapLevel2,
 ).$usage('index');
 
-// const animation = tgpu.fn([d.f32, d.f32, d.f32, d.f32], LineVertex)(
-//   (i, t, fx, fy) => {
-//     return LineVertex({
-//       position: d.vec2f(0.8 * cos(0.1 * fx * i), 0.8 * sin(0.1 * fy * i)),
-//       radius: 0.05 * clamp(sin(6 * Math.PI * i / 200 + Math.PI * t), 0, 0.5) +
-//         0.01,
-//     });
-//   },
-// );
-
 const animation = tgpu.fn([d.f32, d.f32, d.f32, d.f32], LineSegmentVertex)(
   (i, t, fx, fy) => {
     return LineSegmentVertex({
-      position: d.vec2f(fx * cos(0.2 * fy * i), fx * sin(0.2 * fy * i)),
-      radius: 0.05 * clamp(sin(0.1 * i), 0, 0.5) + 0.01,
+      position: d.vec2f(0.8 * cos(0.1 * fx * i), 0.8 * sin(0.1 * fy * i)),
+      radius: 0.05 * clamp(sin(6 * Math.PI * i / 200 + Math.PI * t), 0, 0.5) +
+        0.01,
     });
   },
 );
+
+// const animation = tgpu.fn([d.f32, d.f32, d.f32, d.f32], LineSegmentVertex)(
+//   (i, t, fx, fy) => {
+//     return LineSegmentVertex({
+//       position: d.vec2f(fx * cos(0.2 * fy * i), fx * sin(0.2 * fy * i)),
+//       radius: 0.05 * clamp(sin(0.1 * i), 0, 0.5) + 0.01,
+//     });
+//   },
+// );
 
 const mainVertex = tgpu['~unstable'].vertexFn({
   in: {
@@ -162,20 +163,20 @@ const mainVertex = tgpu['~unstable'].vertexFn({
     arrayLength(bindGroupLayout.$.lineVertices) - 1,
     instanceIndex + 2,
   );
-  // const A = bindGroupLayout.$.lineVertices[firstIndex];
-  // const B = bindGroupLayout.$.lineVertices[instanceIndex];
-  // const C = bindGroupLayout.$.lineVertices[instanceIndex + 1];
-  // const D = bindGroupLayout.$.lineVertices[lastIndex];
-  const v = bindGroupLayout.$.lineVertices[0].position;
-  const A = animation(d.f32(instanceIndex), t, v.x, v.y);
-  const B = animation(d.f32(instanceIndex + 1), t, v.x, v.y);
-  const C = animation(d.f32(instanceIndex + 2), t, v.x, v.y);
-  const D = animation(d.f32(instanceIndex + 3), t, v.x, v.y);
+  const A = bindGroupLayout.$.lineVertices[firstIndex];
+  const B = bindGroupLayout.$.lineVertices[instanceIndex];
+  const C = bindGroupLayout.$.lineVertices[instanceIndex + 1];
+  const D = bindGroupLayout.$.lineVertices[lastIndex];
+  // const v = bindGroupLayout.$.lineVertices[0].position;
+  // const A = animation(d.f32(instanceIndex), t, v.x, v.y);
+  // const B = animation(d.f32(instanceIndex + 1), t, v.x, v.y);
+  // const C = animation(d.f32(instanceIndex + 2), t, v.x, v.y);
+  // const D = animation(d.f32(instanceIndex + 3), t, v.x, v.y);
 
   const result = lineSegmentVariableWidth(vertexIndex, A, B, C, D);
 
   return {
-    outPos: d.vec4f(result.vertexPosition, 0.0, 1),
+    outPos: d.vec4f(result.vertexPosition, 0, 1),
     instanceIndex: vertexIndex,
     uv: result.uv,
   };
@@ -348,7 +349,7 @@ const draw = (timeMs: number) => {
   pipeline
     .with(bindGroupLayout, uniformsBindGroup)
     .withColorAttachment({ ...colorAttachment, loadOp: 'clear' })
-    .drawIndexed(lineSegmentIndicesCapLevel1.length, 200);
+    .drawIndexed(lineSegmentIndicesCapLevel2.length, 200);
 
   // outlinePipeline
   //   .with(bindGroupLayout, uniformsBindGroup)
