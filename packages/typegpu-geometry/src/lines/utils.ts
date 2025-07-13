@@ -1,6 +1,16 @@
 import tgpu from 'typegpu';
 import { bool, f32, struct, vec2f } from 'typegpu/data';
-import { dot, length, normalize, select, sqrt, sub } from 'typegpu/std';
+import {
+  clamp,
+  distance,
+  dot,
+  length,
+  mix,
+  normalize,
+  select,
+  sqrt,
+  sub,
+} from 'typegpu/std';
 import { addMul } from '../utils.ts';
 
 const ExternalNormals = struct({
@@ -77,12 +87,24 @@ export const limitTowardsMiddle = tgpu.fn(
   [vec2f, vec2f, vec2f, vec2f],
   LimitAlongResult,
 )(
-  (A0, A1, B0, B1) => {
-    const int = intersectLines(A0, A1, B0, B1);
-    if (int.t <= 0 || int.t >= 1) {
-      // they don't intersect, return untouched
-      return LimitAlongResult({ a: A1, b: B1 });
+  (M, dir, p1, p2) => {
+    const t1 = dot(sub(p1, M), dir);
+    const t2 = dot(sub(p2, M), dir);
+    if (t1 < t2) {
+      return LimitAlongResult({ a: p1, b: p2 });
     }
-    return LimitAlongResult({ a: int.point, b: int.point });
+    const t = clamp((0 - t1) / (t2 - t1), 0, 1);
+    const p = mix(p1, p2, t);
+    return LimitAlongResult({ a: p, b: p });
+  },
+);
+
+export const distanceToLineSegment = tgpu.fn([vec2f, vec2f, vec2f], f32)(
+  (A, B, point) => {
+    const p = sub(point, A);
+    const AB = sub(B, A);
+    const t = clamp(dot(p, AB) / dot(AB, AB), 0, 1);
+    const projP = addMul(A, AB, t);
+    return distance(point, projP);
   },
 );

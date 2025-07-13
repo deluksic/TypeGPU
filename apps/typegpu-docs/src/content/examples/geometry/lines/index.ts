@@ -1,8 +1,18 @@
 import tgpu from 'typegpu';
 import * as d from 'typegpu/data';
 import type { ColorAttachment } from '../../../../../../../packages/typegpu/src/core/pipeline/renderPipeline.ts';
-import { arrayLength, clamp, cos, max, min, select, sin } from 'typegpu/std';
 import {
+  arrayLength,
+  clamp,
+  cos,
+  length,
+  max,
+  min,
+  select,
+  sin,
+} from 'typegpu/std';
+import {
+  distanceToLineSegment,
   lineSegmentIndicesCapLevel1,
   lineSegmentIndicesCapLevel2,
   lineSegmentVariableWidth,
@@ -85,10 +95,10 @@ const lineVertices = [
   }),
   LineSegmentVertex({
     position: d.vec2f(-0.4, 0),
-    radius: 0.25,
+    radius: 0.2,
   }),
   LineSegmentVertex({
-    position: d.vec2f(-0.2, 0),
+    position: d.vec2f(0, 0),
     radius: 0.1,
   }),
   LineSegmentVertex({
@@ -147,8 +157,12 @@ const mainVertex = tgpu['~unstable'].vertexFn({
   },
   out: {
     outPos: d.builtin.position,
+    position: d.vec2f,
     instanceIndex: d.interpolate('flat', d.u32),
-    uv: d.vec2f,
+    posA: d.vec2f,
+    posB: d.vec2f,
+    posC: d.vec2f,
+    posD: d.vec2f,
   },
 })(({ vertexIndex, instanceIndex }) => {
   const t = bindGroupLayout.$.uniforms.time;
@@ -163,22 +177,26 @@ const mainVertex = tgpu['~unstable'].vertexFn({
     arrayLength(bindGroupLayout.$.lineVertices) - 1,
     instanceIndex + 2,
   );
-  const A = bindGroupLayout.$.lineVertices[firstIndex];
-  const B = bindGroupLayout.$.lineVertices[instanceIndex];
-  const C = bindGroupLayout.$.lineVertices[instanceIndex + 1];
-  const D = bindGroupLayout.$.lineVertices[lastIndex];
-  // const v = bindGroupLayout.$.lineVertices[0].position;
-  // const A = animation(d.f32(instanceIndex), t, v.x, v.y);
-  // const B = animation(d.f32(instanceIndex + 1), t, v.x, v.y);
-  // const C = animation(d.f32(instanceIndex + 2), t, v.x, v.y);
-  // const D = animation(d.f32(instanceIndex + 3), t, v.x, v.y);
+  // const A = bindGroupLayout.$.lineVertices[firstIndex];
+  // const B = bindGroupLayout.$.lineVertices[instanceIndex];
+  // const C = bindGroupLayout.$.lineVertices[instanceIndex + 1];
+  // const D = bindGroupLayout.$.lineVertices[lastIndex];
+  const v = bindGroupLayout.$.lineVertices[0].position;
+  const A = animation(d.f32(instanceIndex), t, v.x, v.y);
+  const B = animation(d.f32(instanceIndex + 1), t, v.x, v.y);
+  const C = animation(d.f32(instanceIndex + 2), t, v.x, v.y);
+  const D = animation(d.f32(instanceIndex + 3), t, v.x, v.y);
 
   const result = lineSegmentVariableWidth(vertexIndex, A, B, C, D);
 
   return {
     outPos: d.vec4f(result.vertexPosition, 0, 1),
     instanceIndex: vertexIndex,
-    uv: result.uv,
+    position: result.vertexPosition,
+    posA: A.position,
+    posB: B.position,
+    posC: C.position,
+    posD: D.position,
   };
 });
 
@@ -188,33 +206,62 @@ const mainFragment = tgpu['~unstable'].fragmentFn({
   in: {
     instanceIndex: d.interpolate('flat', d.u32),
     frontFacing: d.builtin.frontFacing,
-    position: d.builtin.position,
-    uv: d.vec2f,
+    screenPosition: d.builtin.position,
+    position: d.vec2f,
+    posA: d.vec2f,
+    posB: d.vec2f,
+    posC: d.vec2f,
+    posD: d.vec2f,
   },
   out: d.vec4f,
-})(({ position, instanceIndex, frontFacing, uv }) => {
-  const colors = [
-    d.vec3f(1, 0, 0), // 0
-    d.vec3f(0, 1, 0), // 1
-    d.vec3f(0, 0, 1), // 2
-    d.vec3f(1, 0, 1), // 3
-    d.vec3f(1, 1, 0), // 4
-    d.vec3f(0, 1, 1), // 5
-  ];
-  const color = d.vec3f(0, cos(uv.y * 60), 1);
-  // const color = colors[instanceIndex];
-  if (frontFacing) {
-    return d.vec4f(color, 0.5);
-  }
-  return d.vec4f(
-    color,
-    select(
-      d.f32(0),
-      d.f32(1),
-      ((d.u32(position.x) >> 3) % 2) !== ((d.u32(position.y) >> 3) % 2),
-    ),
-  );
-});
+})(
+  (
+    {
+      screenPosition,
+      position,
+      instanceIndex,
+      frontFacing,
+      posA,
+      posB,
+      posC,
+      posD,
+    },
+  ) => {
+    const colors = [
+      d.vec3f(1, 0, 0), // 0
+      d.vec3f(0, 1, 0), // 1
+      d.vec3f(0, 0, 1), // 2
+      d.vec3f(1, 0, 1), // 3
+      d.vec3f(1, 1, 0), // 4
+      d.vec3f(0, 1, 1), // 5
+    ];
+    const dist = min(
+      min(
+        distanceToLineSegment(posA, posB, position),
+        distanceToLineSegment(posB, posC, position),
+      ),
+      distanceToLineSegment(posC, posD, position),
+    );
+    const color = d.vec3f(
+      0,
+      cos(dist * 100),
+      1,
+    );
+    // const color = colors[instanceIndex];
+    if (frontFacing) {
+      return d.vec4f(color, 0.5);
+    }
+    return d.vec4f(
+      color,
+      select(
+        d.f32(0),
+        d.f32(1),
+        ((d.u32(screenPosition.x) >> 3) % 2) !==
+          ((d.u32(screenPosition.y) >> 3) % 2),
+      ),
+    );
+  },
+);
 
 const outlineFragment = tgpu['~unstable'].fragmentFn({
   in: {
@@ -354,7 +401,7 @@ const draw = (timeMs: number) => {
   // outlinePipeline
   //   .with(bindGroupLayout, uniformsBindGroup)
   //   .withColorAttachment(colorAttachment)
-  //   .drawIndexed(outlineIndicesCapLevel1.length, 200);
+  //   .drawIndexed(lineSegmentWireframeIndicesCapLevel2.length, 200);
 
   // circlesPipeline
   //   .with(bindGroupLayout, uniformsBindGroup)
