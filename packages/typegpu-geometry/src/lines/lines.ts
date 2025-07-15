@@ -13,7 +13,7 @@ import {
 } from '../utils.ts';
 import { externalNormals, limitTowardsMiddle, miterPoint } from './utils.ts';
 
-const JOIN_LIMIT = tgpu['~unstable'].const(f32, 0.99);
+const JOIN_LIMIT = tgpu['~unstable'].const(f32, 0.999);
 
 const JoinResult = struct({
   uL: vec2f,
@@ -30,7 +30,7 @@ const JoinResult = struct({
   joinDR: bool,
 });
 
-const solveJoin = tgpu.fn(
+const solveRoundJoin = tgpu.fn(
   [vec2f, vec2f, vec2f, vec2f, vec2f],
   JoinResult,
 )(
@@ -48,8 +48,8 @@ const solveJoin = tgpu.fn(
     const midD = bisectCcw(nDL, nDR);
     const midR = bisectCcw(nUR, nDR);
     const midL = bisectCcw(nDL, nUL);
-    const miterU = miterPoint(nUL, nUR);
-    const miterD = miterPoint(nDR, nDL);
+    const reverseMiterU = miterPoint(nUL, nUR);
+    const reverseMiterD = miterPoint(nDR, nDL);
 
     const joinU = dot(nUL, nUR) < JOIN_LIMIT.$;
     const joinD = dot(nDL, nDR) < JOIN_LIMIT.$;
@@ -96,13 +96,13 @@ const solveJoin = tgpu.fn(
       // side == -1
       if (clockWise) {
         return JoinResult({
-          uL: miterU,
-          u: miterU,
-          uR: miterU,
+          uL: reverseMiterU,
+          u: reverseMiterU,
+          uR: reverseMiterU,
           c: center,
-          dL: miterD,
-          d: miterD,
-          dR: miterD,
+          dL: reverseMiterD,
+          d: reverseMiterD,
+          dR: reverseMiterD,
           joinUL: false,
           joinUR: false,
           joinDL: false,
@@ -132,9 +132,9 @@ const solveJoin = tgpu.fn(
         u: select(midpU, midU, joinU),
         uR: select(midpU, nUR, joinU),
         c: center,
-        dL: miterD,
-        d: miterD,
-        dR: miterD,
+        dL: reverseMiterD,
+        d: reverseMiterD,
+        dR: reverseMiterD,
         joinUL: joinU,
         joinUR: joinU,
         joinDL: false,
@@ -144,9 +144,9 @@ const solveJoin = tgpu.fn(
     }
 
     return JoinResult({
-      uL: miterU,
-      u: miterU,
-      uR: miterU,
+      uL: reverseMiterU,
+      u: reverseMiterU,
+      uR: reverseMiterU,
       c: center,
       dL: select(midpD, nDL, joinD),
       d: select(midpD, midD, joinD),
@@ -174,15 +174,13 @@ const solveMiterJoin = tgpu.fn(
     const sideDR = select(f32(-1), f32(1), xDR - xL >= 0);
     const center = mul(add(add(nUL, nUR), add(nDL, nDR)), 0.25);
 
-    const midU = bisectCcw(nUR, nUL);
-    const midD = bisectCcw(nDL, nDR);
     const midR = bisectCcw(nUR, nDR);
     const midL = bisectCcw(nDL, nUL);
-    const miterU = miterPoint(nUL, nUR);
-    const miterD = miterPoint(nDR, nDL);
+    const reverseMiterU = miterPoint(nUL, nUR);
+    const reverseMiterD = miterPoint(nDR, nDL);
 
-    const miterUU = miterPoint(nUR, nUL);
-    const miterDD = miterPoint(nDL, nDR);
+    const miterU = miterPoint(nUR, nUL);
+    const miterD = miterPoint(nDL, nDR);
 
     const joinU = dot(nUL, nUR) < JOIN_LIMIT.$;
     const joinD = dot(nDL, nDR) < JOIN_LIMIT.$;
@@ -195,13 +193,13 @@ const solveMiterJoin = tgpu.fn(
       if (side === 1) {
         if (clockWise) {
           return JoinResult({
-            uL: miterUU,
-            u: miterUU,
-            uR: miterUU,
+            uL: miterU,
+            u: miterU,
+            uR: miterU,
             c: center,
-            dL: miterDD,
-            d: miterDD,
-            dR: miterDD,
+            dL: miterD,
+            d: miterD,
+            dR: miterD,
             joinUL: joinU,
             joinUR: joinU,
             joinDL: joinD,
@@ -227,13 +225,13 @@ const solveMiterJoin = tgpu.fn(
       // side == -1
       if (clockWise) {
         return JoinResult({
-          uL: miterU,
-          u: miterU,
-          uR: miterU,
+          uL: reverseMiterU,
+          u: reverseMiterU,
+          uR: reverseMiterU,
           c: center,
-          dL: miterD,
-          d: miterD,
-          dR: miterD,
+          dL: reverseMiterD,
+          d: reverseMiterD,
+          dR: reverseMiterD,
           joinUL: false,
           joinUR: false,
           joinDL: false,
@@ -259,13 +257,13 @@ const solveMiterJoin = tgpu.fn(
 
     if (sideUR === 1) {
       return JoinResult({
-        uL: miterUU,
-        u: miterUU,
-        uR: miterUU,
+        uL: miterU,
+        u: miterU,
+        uR: miterU,
         c: center,
-        dL: miterD,
-        d: miterD,
-        dR: miterD,
+        dL: reverseMiterD,
+        d: reverseMiterD,
+        dR: reverseMiterD,
         joinUL: joinU,
         joinUR: joinU,
         joinDL: false,
@@ -275,13 +273,13 @@ const solveMiterJoin = tgpu.fn(
     }
 
     return JoinResult({
-      uL: miterU,
-      u: miterU,
-      uR: miterU,
+      uL: reverseMiterU,
+      u: reverseMiterU,
+      uR: reverseMiterU,
       c: center,
-      dL: miterDD,
-      d: miterDD,
-      dR: miterDD,
+      dL: miterD,
+      d: miterD,
+      dR: miterD,
       joinUL: false,
       joinUR: false,
       joinDL: joinD,
@@ -361,7 +359,7 @@ export const lineSegmentVariableWidth = tgpu.fn([
 
   let joinB = solveCap(eBC.n1, eBC.n2);
   if (!isCapB) {
-    joinB = solveMiterJoin(nAB, eAB.n1, eBC.n1, eAB.n2, eBC.n2);
+    joinB = solveRoundJoin(nAB, eAB.n1, eBC.n1, eAB.n2, eBC.n2);
   }
 
   let v0 = addMul(B.position, joinB.u, B.radius);
@@ -372,7 +370,7 @@ export const lineSegmentVariableWidth = tgpu.fn([
 
   let joinC = solveCap(eBC.n2, eBC.n1);
   if (!isCapC) {
-    joinC = solveMiterJoin(nBC, eBC.n1, eCD.n1, eBC.n2, eCD.n2);
+    joinC = solveRoundJoin(nBC, eBC.n1, eCD.n1, eBC.n2, eCD.n2);
   }
 
   let v5 = addMul(C.position, joinC.u, C.radius);

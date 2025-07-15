@@ -89,6 +89,7 @@ const mainVertex = tgpu['~unstable'].vertexFn({
     position: vec2f,
     instanceIndex: interpolate('flat', u32),
     vertexIndex: interpolate('flat', u32),
+    situationIndex: interpolate('flat', u32),
   },
 })(({ vertexIndex, instanceIndex }) => {
   const t = bindGroupLayout.$.uniforms.time;
@@ -97,12 +98,14 @@ const mainVertex = tgpu['~unstable'].vertexFn({
   const C = testCaseSlot.$(instanceIndex + 2, t);
   let D = testCaseSlot.$(instanceIndex + 3, t);
 
+  // disconnect or cap lines if radius is < 0
   if (B.radius < 0 || C.radius < 0) {
     return {
       outPos: vec4f(),
       position: vec2f(),
       instanceIndex: 0,
       vertexIndex: 0,
+      situationIndex: 0,
     };
   }
   if (A.radius < 0) {
@@ -119,6 +122,7 @@ const mainVertex = tgpu['~unstable'].vertexFn({
     position: result.vertexPosition,
     instanceIndex,
     vertexIndex,
+    situationIndex: result.situationIndex,
   };
 });
 
@@ -126,15 +130,25 @@ const mainFragment = tgpu['~unstable'].fragmentFn({
   in: {
     instanceIndex: interpolate('flat', u32),
     vertexIndex: interpolate('flat', u32),
+    situationIndex: interpolate('flat', u32),
     frontFacing: builtin.frontFacing,
     screenPosition: builtin.position,
     position: vec2f,
   },
   out: vec4f,
 })(
-  ({ instanceIndex, vertexIndex, frontFacing, screenPosition, position }) => {
+  (
+    {
+      instanceIndex,
+      vertexIndex,
+      situationIndex,
+      frontFacing,
+      screenPosition,
+      position,
+    },
+  ) => {
     const fillType = bindGroupLayout.$.uniforms.fillType;
-    if (fillType === 3) {
+    if (fillType === 1) {
       // typegpu gradient
       return mix(
         vec4f(0.77, 0.39, 1, 0.5),
@@ -142,7 +156,13 @@ const mainFragment = tgpu['~unstable'].fragmentFn({
         position.x * 0.5 + 0.5,
       );
     }
-    const index = select(vertexIndex, instanceIndex, fillType === 1);
+    let index = instanceIndex;
+    if (fillType === 3) {
+      index = vertexIndex;
+    }
+    if (fillType === 4) {
+      index = situationIndex;
+    }
     const colors = [
       vec3f(1, 0, 0), // 0
       vec3f(0, 1, 0), // 1
@@ -328,7 +348,10 @@ const draw = (timeMs: number) => {
   if (wireframe) {
     pipelines.outline
       .with(bindGroupLayout, uniformsBindGroup)
-      .withColorAttachment(colorAttachment)
+      .withColorAttachment({
+        ...colorAttachment,
+        loadOp: fillType === 0 ? 'clear' : 'load',
+      })
       .drawIndexed(lineSegmentWireframeIndicesCapLevel2.length, INSTANCE_COUNT);
   }
   if (showRadii) {
@@ -357,9 +380,10 @@ runAnimationFrame(0);
 
 const fillOptions = {
   None: 0,
-  Instance: 1,
-  Triangle: 2,
-  Solid: 3,
+  Solid: 1,
+  Instance: 2,
+  Triangle: 3,
+  Situation: 4,
 };
 
 export const controls = {

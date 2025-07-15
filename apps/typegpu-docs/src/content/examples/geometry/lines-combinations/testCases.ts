@@ -43,7 +43,7 @@ export const case1 = testCaseShell(
   },
 );
 
-export const case2 = testCaseShell(
+export const zcase2 = testCaseShell(
   (vertexIndex, t) => {
     'kernel';
     const side = clamp(f32(vertexIndex) - 2, -1, 1);
@@ -58,7 +58,7 @@ export const case2 = testCaseShell(
 export const case3 = testCaseShell(
   (vertexIndex, t) => {
     'kernel';
-    const angle = Math.PI * f32(clamp(f32(vertexIndex) - 1, 0, 50)) / 50;
+    const angle = Math.PI * clamp(f32(vertexIndex) - 1, 0, 50) / 50;
     const radius = 0.5 * cos(t);
     return LineSegmentVertex({
       position: vec2f(radius * cos(angle), radius * sin(angle)),
@@ -70,7 +70,8 @@ export const case3 = testCaseShell(
 export const case4 = testCaseShell(
   (vertexIndex, t) => {
     'kernel';
-    const x = f32(clamp(f32(vertexIndex) - 1, 0, 50) - 25) / 25;
+    const i = clamp(f32(vertexIndex) - 1, 0, 48) / 48;
+    const x = 2 * i - 1;
     const s = sin(t);
     const n = 10 * s * s * s * s + 0.25;
     return LineSegmentVertex({
@@ -83,7 +84,7 @@ export const case4 = testCaseShell(
 export const case5 = testCaseShell(
   (vertexIndex, t) => {
     'kernel';
-    const i = f32(clamp(f32(vertexIndex) - 1, 0, 200)) / 200;
+    const i = clamp(f32(vertexIndex) - 1, 0, 200) / 200;
     const x = cos(6 * Math.PI * i);
     const y = cos(5 * Math.PI * i);
     return LineSegmentVertex({
@@ -93,16 +94,17 @@ export const case5 = testCaseShell(
   },
 );
 
-export const case6 = testCaseShell(
+export const perlinTraces = testCaseShell(
   (vertexIndex, t) => {
     'kernel';
-    const i = f32(max(f32(vertexIndex), 0)) / 100;
+    const i = f32(max(vertexIndex, 0)) / 100;
     const n = floor(i);
     const x = 2 * (i - n) - 1;
     const y = 0.125 * n - 0.5 +
       0.5 * perlin2d.sample(vec2f(2 * x, t + 0.1 * n)) +
       0.25 * perlin2d.sample(vec2f(4 * x, t + 100 + 0.1 * n)) +
-      0.125 * perlin2d.sample(vec2f(8 * x, t + 200 + 0.1 * n));
+      0.125 * perlin2d.sample(vec2f(8 * x, t + 200 + 0.2 * n)) +
+      0.0625 * perlin2d.sample(vec2f(16 * x, t + 300 + 0.3 * n));
     return LineSegmentVertex({
       position: vec2f(0.8 * x, y),
       radius: select(0.002 * (n + 1), -1, vertexIndex % 100 === 0),
