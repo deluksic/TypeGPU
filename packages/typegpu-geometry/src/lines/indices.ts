@@ -1,20 +1,20 @@
 // deno-fmt-ignore
 export const lineSegmentIndicesCapLevel0 = [
-  0, 2, 1,
-  1, 2, 3,
-  2, 4, 3,
-  3, 6, 1,
-  6, 3, 8,
-  5, 6, 7,
-  7, 6, 8,
-  8, 9, 7,
+  0, 4, 5,
+  1, 2, 0,
+  2, 3, 4,
+  4, 0, 2,
+  5, 9, 0,
+  6, 7, 5,
+  7, 8, 9,
+  9, 5, 7,
 ]
 
 // deno-fmt-ignore
 export const lineSegmentIndicesCapLevel1 = [
   ...lineSegmentIndicesCapLevel0,
-  10, 0, 1,
-  11, 3, 4,
+  10, 1, 0,
+  11, 4, 3,
   12, 6, 5,
   13, 9, 8,
 ]
@@ -22,10 +22,10 @@ export const lineSegmentIndicesCapLevel1 = [
 // deno-fmt-ignore
 export const lineSegmentIndicesCapLevel2 = [
   ...lineSegmentIndicesCapLevel1,
-  14, 0, 10,
-  15, 10, 1,
-  16, 3, 11,
-  17, 11, 4,
+  14, 10, 0,
+  15, 1, 10,
+  16, 11, 3,
+  17, 4, 11,
   18, 12, 5,
   19, 6, 12,
   20, 13, 8,
@@ -36,17 +36,17 @@ export const lineSegmentIndicesCapLevel2 = [
 export const lineSegmentWireframeIndicesCapLevel0 = [
   0, 1,
   0, 2,
+  0, 4,
+  0, 5,
+  0, 9,
   1, 2,
-  1, 3,
   2, 3,
   2, 4,
   3, 4,
-  1, 6,
-  3, 6,
-  3, 8,
-  6, 8,
+  4, 5,
   5, 6,
   5, 7,
+  5, 9,
   6, 7,
   7, 8,
   7, 9,

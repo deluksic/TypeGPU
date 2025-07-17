@@ -364,11 +364,11 @@ export const lineSegmentVariableWidth = tgpu.fn([
     joinB = capB;
   }
 
-  let v0 = addMul(B.position, joinB.u, B.radius);
-  let v1 = addMul(B.position, joinB.uR, B.radius);
+  let v0 = addMul(B.position, joinB.uR, B.radius);
+  let v1 = addMul(B.position, joinB.u, B.radius);
   let v2 = addMul(B.position, joinB.c, B.radius);
-  let v3 = addMul(B.position, joinB.dR, B.radius);
-  let v4 = addMul(B.position, joinB.d, B.radius);
+  let v3 = addMul(B.position, joinB.d, B.radius);
+  let v4 = addMul(B.position, joinB.dR, B.radius);
 
   const capC = solveCap(eBC.n2, eBC.n1);
   let joinC = solveMiterJoin(nBC, eBC.n1, eCD.n1, eBC.n2, eCD.n2);
@@ -376,42 +376,42 @@ export const lineSegmentVariableWidth = tgpu.fn([
     joinC = capC;
   }
 
-  let v5 = addMul(C.position, joinC.u, C.radius);
-  let v6 = addMul(C.position, joinC.uL, C.radius);
+  let v5 = addMul(C.position, joinC.dL, C.radius);
+  let v6 = addMul(C.position, joinC.d, C.radius);
   let v7 = addMul(C.position, joinC.c, C.radius);
-  let v8 = addMul(C.position, joinC.dL, C.radius);
-  let v9 = addMul(C.position, joinC.d, C.radius);
+  let v8 = addMul(C.position, joinC.u, C.radius);
+  let v9 = addMul(C.position, joinC.uL, C.radius);
 
   const midBC = midPoint(B.position, C.position);
   const tBC1 = rot90cw(eBC.n1);
   const tBC2 = rot90ccw(eBC.n2);
 
-  const lim16 = limitTowardsMiddle(midBC, tBC1, v1, v6);
-  const lim38 = limitTowardsMiddle(midBC, tBC2, v3, v8);
-  v1 = lim16.a;
-  v6 = lim16.b;
-  v3 = lim38.a;
-  v8 = lim38.b;
+  const lim16 = limitTowardsMiddle(midBC, tBC1, v0, v9);
+  const lim38 = limitTowardsMiddle(midBC, tBC2, v4, v5);
+  v0 = lim16.a;
+  v9 = lim16.b;
+  v4 = lim38.a;
+  v5 = lim38.b;
 
   if (!joinB.joinUR) {
-    v0 = v1;
+    v1 = v0;
   }
   if (!joinB.joinDR) {
-    v4 = v3;
+    v3 = v4;
   }
   if (!joinC.joinUL) {
-    v5 = v6;
+    v8 = v9;
   }
   if (!joinC.joinDL) {
-    v9 = v8;
+    v6 = v5;
   }
   if (joinB.situationIndex === 2) {
     // remove central triangle but only after limits are applied
-    v2 = v1;
+    v2 = v0;
   }
   if (joinC.situationIndex === 2) {
     // remove central triangle but only after limits are applied
-    v7 = v6;
+    v7 = v9;
   }
 
   let d10 = joinB.u;
@@ -467,83 +467,5 @@ export const lineSegmentVariableWidth = tgpu.fn([
   return {
     vertexPosition: points[vertexIndex] as v2f,
     situationIndex: joinB.situationIndex,
-  };
-});
-
-export const lineSingleSegmentVariableWidth = tgpu.fn([
-  u32,
-  LineSegmentVertex,
-  LineSegmentVertex,
-], LineSegmentOutput)((vertexIndex, A, B) => {
-  const AB = sub(B.position, A.position);
-  const eAB = externalNormals(AB, A.radius, B.radius);
-
-  const joinA = solveCap(eAB.n1, eAB.n2);
-  const joinB = solveCap(eAB.n2, eAB.n1);
-
-  const v0 = addMul(A.position, joinA.u, A.radius);
-  const v1 = addMul(A.position, joinA.uR, A.radius);
-  const v2 = addMul(A.position, joinA.c, A.radius);
-  const v3 = addMul(A.position, joinA.dR, A.radius);
-  const v4 = addMul(A.position, joinA.d, A.radius);
-  const v5 = addMul(B.position, joinB.u, B.radius);
-  const v6 = addMul(B.position, joinB.uL, B.radius);
-  const v7 = addMul(B.position, joinB.c, B.radius);
-  const v8 = addMul(B.position, joinB.dL, B.radius);
-  const v9 = addMul(B.position, joinB.d, B.radius);
-
-  let d10 = joinA.u;
-  let d11 = joinA.d;
-  let d12 = joinA.u;
-  let d13 = joinA.d;
-  let d14 = joinA.u;
-  let d15 = joinA.u;
-  let d16 = joinB.d;
-  let d17 = joinB.d;
-  let d18 = joinB.u;
-  let d19 = joinB.u;
-  let d20 = joinB.d;
-  let d21 = joinB.d;
-
-  if (joinA.joinUR) {
-    d10 = bisectCcw(joinA.uR, joinA.u);
-    d14 = bisectNoCheck(d10, joinA.u);
-    d15 = bisectNoCheck(joinA.uR, d10);
-  }
-  if (joinA.joinDR) {
-    d11 = bisectCcw(joinA.d, joinA.dR);
-    d16 = bisectNoCheck(d11, joinA.dR);
-    d17 = bisectNoCheck(joinA.d, d11);
-  }
-  if (joinB.joinUL) {
-    d12 = bisectCcw(joinB.u, joinB.uL);
-    d18 = bisectNoCheck(joinB.u, d12);
-    d19 = bisectNoCheck(d12, joinB.uL);
-  }
-  if (joinB.joinDL) {
-    d13 = bisectCcw(joinB.dL, joinB.d);
-    d20 = bisectNoCheck(joinB.dL, d13);
-    d21 = bisectNoCheck(d13, joinB.d);
-  }
-
-  const v10 = addMul(A.position, d10, A.radius);
-  const v11 = addMul(A.position, d11, A.radius);
-  const v12 = addMul(B.position, d12, B.radius);
-  const v13 = addMul(B.position, d13, B.radius);
-  const v14 = addMul(A.position, d14, A.radius);
-  const v15 = addMul(A.position, d15, A.radius);
-  const v16 = addMul(A.position, d16, A.radius);
-  const v17 = addMul(A.position, d17, A.radius);
-  const v18 = addMul(B.position, d18, B.radius);
-  const v19 = addMul(B.position, d19, B.radius);
-  const v20 = addMul(B.position, d20, B.radius);
-  const v21 = addMul(B.position, d21, B.radius);
-
-  // deno-fmt-ignore
-  const points = [v0, v1, v2, v3, v4, v5, v6, v7, v8, v9, v10, v11, v12, v13, v14, v15, v16, v17, v18, v19, v20, v21];
-
-  return {
-    vertexPosition: points[vertexIndex] as v2f,
-    situationIndex: joinA.situationIndex,
   };
 });
