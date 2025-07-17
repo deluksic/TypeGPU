@@ -11,7 +11,12 @@ import {
   rot90ccw,
   rot90cw,
 } from '../utils.ts';
-import { externalNormals, limitTowardsMiddle, miterPoint } from './utils.ts';
+import {
+  externalNormals,
+  limitTowardsMiddle,
+  miterLimit,
+  miterPoint,
+} from './utils.ts';
 
 const JOIN_LIMIT = tgpu['~unstable'].const(f32, 0.999);
 
@@ -172,18 +177,14 @@ const solveMiterJoin = tgpu.fn(
     const yDR = cross2d(nL, nDR);
     const sideUR = select(f32(-1), f32(1), xUR - xL >= 0);
     const sideDR = select(f32(-1), f32(1), xDR - xL >= 0);
-    const center = mul(add(add(nUL, nUR), add(nDL, nDR)), 0.25);
 
     const midR = bisectCcw(nUR, nDR);
     const midL = bisectCcw(nDL, nUL);
     const reverseMiterU = miterPoint(nUL, nUR);
     const reverseMiterD = miterPoint(nDR, nDL);
 
-    const miterU = miterPoint(nUR, nUL);
-    const miterD = miterPoint(nDL, nDR);
-
-    const joinU = dot(nUL, nUR) < JOIN_LIMIT.$;
-    const joinD = dot(nDL, nDR) < JOIN_LIMIT.$;
+    const miterU = miterLimit(nUR, nUL);
+    const miterD = miterLimit(nDL, nDR);
 
     if (sideUR === sideDR) {
       const side = sideUR;
@@ -193,17 +194,17 @@ const solveMiterJoin = tgpu.fn(
       if (side === 1) {
         if (clockWise) {
           return JoinResult({
-            uL: miterU,
-            u: miterU,
-            uR: miterU,
-            c: center,
-            dL: miterD,
-            d: miterD,
-            dR: miterD,
-            joinUL: joinU,
-            joinUR: joinU,
-            joinDL: joinD,
-            joinDR: joinD,
+            uL: miterU.left,
+            u: miterU.mid,
+            uR: miterU.right,
+            c: midPoint(miterU.mid, miterD.mid),
+            dL: miterD.left,
+            d: miterD.mid,
+            dR: miterD.right,
+            joinUL: false,
+            joinUR: false,
+            joinDL: false,
+            joinDR: false,
             situationIndex: 0,
           });
         }
@@ -215,10 +216,10 @@ const solveMiterJoin = tgpu.fn(
           dL: nDL,
           d: midR,
           dR: nDR,
-          joinUL: true,
-          joinUR: true,
-          joinDL: true,
-          joinDR: true,
+          joinUL: false,
+          joinUR: false,
+          joinDL: false,
+          joinDR: false,
           situationIndex: 1,
         });
       }
@@ -228,7 +229,7 @@ const solveMiterJoin = tgpu.fn(
           uL: reverseMiterU,
           u: reverseMiterU,
           uR: reverseMiterU,
-          c: center,
+          c: midPoint(reverseMiterU, reverseMiterD),
           dL: reverseMiterD,
           d: reverseMiterD,
           dR: reverseMiterD,
@@ -247,25 +248,25 @@ const solveMiterJoin = tgpu.fn(
         dL: nDL,
         d: midL,
         dR: nDR,
-        joinUL: true,
-        joinUR: true,
-        joinDL: true,
-        joinDR: true,
+        joinUL: false,
+        joinUR: false,
+        joinDL: false,
+        joinDR: false,
         situationIndex: 3,
       });
     }
 
     if (sideUR === 1) {
       return JoinResult({
-        uL: miterU,
-        u: miterU,
-        uR: miterU,
-        c: center,
+        uL: miterU.right,
+        u: miterU.mid,
+        uR: miterU.left,
+        c: add(miterU.mid, normalize(sub(reverseMiterD, miterU.mid))),
         dL: reverseMiterD,
         d: reverseMiterD,
         dR: reverseMiterD,
-        joinUL: joinU,
-        joinUR: joinU,
+        joinUL: true,
+        joinUR: true,
         joinDL: false,
         joinDR: false,
         situationIndex: 4,
@@ -276,14 +277,14 @@ const solveMiterJoin = tgpu.fn(
       uL: reverseMiterU,
       u: reverseMiterU,
       uR: reverseMiterU,
-      c: center,
-      dL: miterD,
-      d: miterD,
-      dR: miterD,
+      c: add(miterD.mid, normalize(sub(reverseMiterU, miterD.mid))),
+      dL: miterD.left,
+      d: miterD.mid,
+      dR: miterD.right,
       joinUL: false,
       joinUR: false,
-      joinDL: joinD,
-      joinDR: joinD,
+      joinDL: true,
+      joinDR: true,
       situationIndex: 5,
     });
   },
@@ -357,9 +358,10 @@ export const lineSegmentVariableWidth = tgpu.fn([
   const nAB = normalize(AB);
   const nBC = normalize(BC);
 
-  let joinB = solveCap(eBC.n1, eBC.n2);
-  if (!isCapB) {
-    joinB = solveRoundJoin(nAB, eAB.n1, eBC.n1, eAB.n2, eBC.n2);
+  const capB = solveCap(eBC.n1, eBC.n2);
+  let joinB = solveMiterJoin(nAB, eAB.n1, eBC.n1, eAB.n2, eBC.n2);
+  if (isCapB) {
+    joinB = capB;
   }
 
   let v0 = addMul(B.position, joinB.u, B.radius);
@@ -368,9 +370,10 @@ export const lineSegmentVariableWidth = tgpu.fn([
   let v3 = addMul(B.position, joinB.dR, B.radius);
   let v4 = addMul(B.position, joinB.d, B.radius);
 
-  let joinC = solveCap(eBC.n2, eBC.n1);
-  if (!isCapC) {
-    joinC = solveRoundJoin(nBC, eBC.n1, eCD.n1, eBC.n2, eCD.n2);
+  const capC = solveCap(eBC.n2, eBC.n1);
+  let joinC = solveMiterJoin(nBC, eBC.n1, eCD.n1, eBC.n2, eCD.n2);
+  if (isCapC) {
+    joinC = capC;
   }
 
   let v5 = addMul(C.position, joinC.u, C.radius);

@@ -2,8 +2,10 @@ import tgpu from 'typegpu';
 import type { ColorAttachment } from '../../../../../../../packages/typegpu/src/core/pipeline/renderPipeline.ts';
 import { clamp, cos, min, mix, select, sin } from 'typegpu/std';
 import {
+  lineSegmentIndicesCapLevel0,
   lineSegmentIndicesCapLevel2,
   lineSegmentVariableWidth,
+  lineSegmentWireframeIndicesCapLevel0,
   lineSegmentWireframeIndicesCapLevel2,
 } from '@typegpu/geometry';
 import { addMul } from '../../../../../../../packages/typegpu-geometry/src/utils.ts';
@@ -342,7 +344,7 @@ const draw = (timeMs: number) => {
     pipelines.fill
       .with(bindGroupLayout, uniformsBindGroup)
       .withColorAttachment({ ...colorAttachment, loadOp: 'clear' })
-      .drawIndexed(lineSegmentIndicesCapLevel2.length, INSTANCE_COUNT);
+      .drawIndexed(lineSegmentIndicesCapLevel0.length, INSTANCE_COUNT);
   }
 
   if (wireframe) {
@@ -352,7 +354,7 @@ const draw = (timeMs: number) => {
         ...colorAttachment,
         loadOp: fillType === 0 ? 'clear' : 'load',
       })
-      .drawIndexed(lineSegmentWireframeIndicesCapLevel2.length, INSTANCE_COUNT);
+      .drawIndexed(lineSegmentWireframeIndicesCapLevel0.length, INSTANCE_COUNT);
   }
   if (showRadii) {
     pipelines.circles

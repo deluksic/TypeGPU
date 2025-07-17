@@ -43,7 +43,7 @@ export const case1 = testCaseShell(
   },
 );
 
-export const zcase2 = testCaseShell(
+export const case2 = testCaseShell(
   (vertexIndex, t) => {
     'kernel';
     const side = clamp(f32(vertexIndex) - 2, -1, 1);
@@ -117,11 +117,12 @@ export const arms = testCaseShell(
     'kernel';
     const s = sin(t);
     const c = cos(t);
+    const r = 0.25;
     const points = [
-      vec2f(0.5 * s - 0.25, 0.5 * c),
+      vec2f(r * s - 0.25, r * c),
       vec2f(-0.25, 0),
       vec2f(0.25, 0),
-      vec2f(-0.5 * s + 0.25, 0.5 * c),
+      vec2f(-r * s + 0.25, r * c),
     ];
     const i = clamp(i32(vertexIndex) - 1, 0, 3);
     return LineSegmentVertex({
@@ -142,7 +143,7 @@ export const armsSmall = testCaseShell(
   },
 );
 
-export const armsBig = testCaseShell(
+export const zarmsBig = testCaseShell(
   (vertexIndex, t) => {
     'kernel';
     const result = arms(vertexIndex, t);

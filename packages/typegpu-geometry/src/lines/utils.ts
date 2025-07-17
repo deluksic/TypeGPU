@@ -12,7 +12,14 @@ import {
   sqrt,
   sub,
 } from 'typegpu/std';
-import { addMul, bisectCcw, cross2d, rot90ccw } from '../utils.ts';
+import {
+  addMul,
+  bisectCcw,
+  cross2d,
+  midPoint,
+  rot90ccw,
+  rot90cw,
+} from '../utils.ts';
 
 /**
  * Finds the miter point of tangents to two points on respective circles.
@@ -36,6 +43,48 @@ export const miterPoint = tgpu.fn([vec2f, vec2f], vec2f)((a, b) => {
   const t = diff / sin_;
   return addMul(a, rot90ccw(a), t);
 });
+
+const MiterLimitResult = struct({
+  left: vec2f,
+  mid: vec2f,
+  right: vec2f,
+});
+
+export const miterLimit = tgpu.fn([vec2f, vec2f], MiterLimitResult)(
+  (a, b) => {
+    const sin_ = cross2d(a, b);
+    const bisection = bisectCcw(a, b);
+    if (sin_ < 0) {
+      // if the miter is at infinity, just make it super far
+      const same = mul(bisection, -1e6);
+      return {
+        left: same,
+        mid: same,
+        right: same,
+      };
+    }
+    const b2 = dot(b, b);
+    const cos_ = dot(a, b);
+    const diff = b2 - cos_;
+    if (diff * diff < 1e-4) {
+      // the vectors are almost colinear
+      const same = bisection;
+      return {
+        left: same,
+        mid: same,
+        right: same,
+      };
+    }
+    const t = clamp(diff / sin_, 0, 1);
+    const left = addMul(a, rot90ccw(a), t);
+    const right = addMul(b, rot90cw(b), t);
+    return {
+      left: left,
+      mid: midPoint(left, right),
+      right: right,
+    };
+  },
+);
 
 const ExternalNormals = struct({
   n1: vec2f,
