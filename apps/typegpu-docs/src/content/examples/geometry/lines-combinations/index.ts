@@ -2,6 +2,8 @@ import tgpu from 'typegpu';
 import type { ColorAttachment } from '../../../../../../../packages/typegpu/src/core/pipeline/renderPipeline.ts';
 import { clamp, cos, min, mix, select, sin } from 'typegpu/std';
 import {
+  joinSlot,
+  lineJoins,
   lineSegmentIndicesCapLevel3,
   lineSegmentVariableWidth,
   lineSegmentWireframeIndicesCapLevel3,
@@ -20,6 +22,7 @@ import {
   vec4f,
 } from 'typegpu/data';
 import * as testCases from './testCases.ts';
+import { TEST_SEGMENT_COUNT } from './constants.ts';
 
 const presentationFormat = navigator.gpu.getPreferredCanvasFormat();
 const canvas = document.querySelector('canvas');
@@ -125,6 +128,8 @@ const mainVertex = tgpu['~unstable'].vertexFn({
     situationIndex: result.situationIndex,
   };
 });
+
+console.log(tgpu.resolve({ externals: { lineSegmentVariableWidth } }));
 
 const mainFragment = tgpu['~unstable'].fragmentFn({
   in: {
@@ -259,9 +264,11 @@ const circlesVertex = tgpu['~unstable'].vertexFn({
 });
 
 let testCase = testCases.arms;
+let join = lineJoins.round;
 
 function createPipelines() {
   const fill = root['~unstable']
+    .with(joinSlot, join)
     .with(testCaseSlot, testCase)
     .withVertex(mainVertex, {})
     .withFragment(mainFragment, {
@@ -275,6 +282,7 @@ function createPipelines() {
     .withIndexBuffer(indexBuffer);
 
   const outline = root['~unstable']
+    .with(joinSlot, join)
     .with(testCaseSlot, testCase)
     .withVertex(mainVertex, {})
     .withFragment(outlineFragment, {
@@ -326,7 +334,6 @@ let wireframe = true;
 let fillType = 1;
 let animationSpeed = 1;
 let reverse = false;
-const INSTANCE_COUNT = 2000;
 
 const draw = (timeMs: number) => {
   uniformsBuffer.writePartial({
@@ -338,37 +345,38 @@ const draw = (timeMs: number) => {
     loadOp: 'load',
     storeOp: 'store',
   };
-  if (fillType !== 0) {
-    pipelines.fill
-      .with(bindGroupLayout, uniformsBindGroup)
-      .withColorAttachment({ ...colorAttachment, loadOp: 'clear' })
-      .withPerformanceCallback((start, end) => {
-        if (frameId % 20 === 0) {
-          console.log(`${(Number(end - start) * 1e-6).toFixed(2)} ms`);
-        }
-      })
-      .drawIndexed(lineSegmentIndicesCapLevel3.length, INSTANCE_COUNT);
-  }
+  pipelines.fill
+    .with(bindGroupLayout, uniformsBindGroup)
+    .withColorAttachment({ ...colorAttachment, loadOp: 'clear' })
+    .withPerformanceCallback((start, end) => {
+      if (frameId % 20 === 0) {
+        console.log(`${(Number(end - start) * 1e-6).toFixed(2)} ms`);
+      }
+    })
+    .drawIndexed(
+      lineSegmentIndicesCapLevel3.length,
+      fillType === 0 ? 0 : TEST_SEGMENT_COUNT,
+    );
 
   if (wireframe) {
     pipelines.outline
       .with(bindGroupLayout, uniformsBindGroup)
-      .withColorAttachment({
-        ...colorAttachment,
-        loadOp: fillType === 0 ? 'clear' : 'load',
-      })
-      .drawIndexed(lineSegmentWireframeIndicesCapLevel3.length, INSTANCE_COUNT);
+      .withColorAttachment(colorAttachment)
+      .drawIndexed(
+        lineSegmentWireframeIndicesCapLevel3.length,
+        TEST_SEGMENT_COUNT,
+      );
   }
   if (showRadii) {
     pipelines.circles
       .with(bindGroupLayout, uniformsBindGroup)
       .withColorAttachment(colorAttachment)
-      .draw(CIRCLE_SEGMENT_COUNT + 1, INSTANCE_COUNT);
+      .draw(CIRCLE_SEGMENT_COUNT + 1, TEST_SEGMENT_COUNT);
 
     pipelines.centerline
       .with(bindGroupLayout, uniformsBindGroup)
       .withColorAttachment(colorAttachment)
-      .draw(INSTANCE_COUNT);
+      .draw(TEST_SEGMENT_COUNT);
   }
 };
 
@@ -394,10 +402,18 @@ const fillOptions = {
 
 export const controls = {
   'Test Case': {
-    initial: Object.keys(testCases).at(-1),
+    initial: Object.keys(testCases)[0],
     options: Object.keys(testCases),
     onSelectChange: async (selected: keyof typeof testCases) => {
       testCase = testCases[selected];
+      pipelines = createPipelines();
+    },
+  },
+  'Join': {
+    initial: 'round',
+    options: Object.keys(lineJoins),
+    onSelectChange: async (selected: keyof typeof lineJoins) => {
+      join = lineJoins[selected];
       pipelines = createPipelines();
     },
   },

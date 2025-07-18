@@ -1,320 +1,20 @@
 import tgpu from 'typegpu';
-import { bool, f32, struct, u32, vec2f } from 'typegpu/data';
+import { f32, struct, u32, vec2f } from 'typegpu/data';
 import type { Infer, v2f } from 'typegpu/data';
-import { add, dot, mul, normalize, select, sub } from 'typegpu/std';
+import { dot, normalize, select, sub } from 'typegpu/std';
 import {
   addMul,
   bisectCcw,
   bisectNoCheck,
-  cross2d,
   midPoint,
   rot90ccw,
   rot90cw,
 } from '../utils.ts';
-import {
-  externalNormals,
-  intersectLines,
-  limitTowardsMiddle,
-  miterLimit,
-  miterPoint,
-} from './utils.ts';
+import { externalNormals, limitTowardsMiddle } from './utils.ts';
+import { JoinResult } from './types.ts';
+import { roundJoin } from './joins/round.ts';
 
-const JOIN_LIMIT = tgpu['~unstable'].const(f32, 0.999);
-
-type JoinResult = Infer<typeof JoinResult>;
-const JoinResult = struct({
-  uL: vec2f,
-  u: vec2f,
-  uR: vec2f,
-  c: vec2f,
-  dL: vec2f,
-  d: vec2f,
-  dR: vec2f,
-  situationIndex: u32,
-  joinUL: bool,
-  joinDL: bool,
-  joinUR: bool,
-  joinDR: bool,
-});
-
-const solveRoundJoin = tgpu.fn(
-  [vec2f, vec2f, vec2f, vec2f, vec2f],
-  JoinResult,
-)(
-  (nL, nUL, nUR, nDL, nDR) => {
-    const xL = dot(nL, nUL); // == dot(nL, nDL)
-    const xUR = dot(nL, nUR);
-    const xDR = dot(nL, nDR);
-    const yUR = cross2d(nL, nUR);
-    const yDR = cross2d(nL, nDR);
-    const sideUR = select(f32(-1), f32(1), xUR - xL >= 0);
-    const sideDR = select(f32(-1), f32(1), xDR - xL >= 0);
-
-    const midU = bisectCcw(nUR, nUL);
-    const midD = bisectCcw(nDL, nDR);
-    const midR = bisectCcw(nUR, nDR);
-    const midL = bisectCcw(nDL, nUL);
-    const reverseMiterU = miterPoint(nUL, nUR);
-    const reverseMiterD = miterPoint(nDR, nDL);
-
-    const joinU = dot(nUL, nUR) < JOIN_LIMIT.$;
-    const joinD = dot(nDL, nDR) < JOIN_LIMIT.$;
-    const midpU = midPoint(nUL, nUR);
-    const midpD = midPoint(nDL, nDR);
-
-    const maybeJoinedUL = select(midpU, nUL, joinU);
-    const maybeJoinedU = select(midpU, midU, joinU);
-    const maybeJoinedUR = select(midpU, nUR, joinU);
-    const maybeJoinedDL = select(midpD, nDL, joinD);
-    const maybeJoinedD = select(midpD, midD, joinD);
-    const maybeJoinedDR = select(midpD, nDR, joinD);
-
-    const center = mul(
-      add(
-        add(
-          maybeJoinedUR,
-          maybeJoinedUL,
-        ),
-        add(
-          maybeJoinedDL,
-          maybeJoinedDR,
-        ),
-      ),
-      0.25,
-    );
-
-    const crossCenter = intersectLines(nUL, nDL, nUR, nDR).point;
-
-    if (sideUR === sideDR) {
-      const side = sideUR;
-      const XUR = select(xUR, side * 2 - xUR, yUR < 0);
-      const XDR = select(xDR, side * 2 - xDR, yDR < 0);
-      const clockWise = (side * (XUR - XDR)) <= 0;
-      if (side === 1) {
-        if (clockWise) {
-          return JoinResult({
-            uL: maybeJoinedUL,
-            u: maybeJoinedU,
-            uR: maybeJoinedUR,
-            c: center,
-            dL: maybeJoinedDL,
-            d: maybeJoinedD,
-            dR: maybeJoinedDR,
-            joinUL: joinU,
-            joinUR: joinU,
-            joinDL: joinD,
-            joinDR: joinD,
-            situationIndex: 0,
-          });
-        }
-        return JoinResult({
-          uL: nUL,
-          u: midR,
-          uR: nUR,
-          c: midR,
-          dL: nDL,
-          d: midR,
-          dR: nDR,
-          joinUL: true,
-          joinUR: true,
-          joinDL: true,
-          joinDR: true,
-          situationIndex: 1,
-        });
-      }
-      // side == -1
-      if (clockWise) {
-        return JoinResult({
-          uL: reverseMiterU,
-          u: reverseMiterU,
-          uR: reverseMiterU,
-          c: center,
-          dL: reverseMiterD,
-          d: reverseMiterD,
-          dR: reverseMiterD,
-          joinUL: false,
-          joinUR: false,
-          joinDL: false,
-          joinDR: false,
-          situationIndex: 2,
-        });
-      }
-      return JoinResult({
-        uL: nUL,
-        u: midL,
-        uR: nUR,
-        c: midL,
-        dL: nDL,
-        d: midL,
-        dR: nDR,
-        joinUL: true,
-        joinUR: true,
-        joinDL: true,
-        joinDR: true,
-        situationIndex: 3,
-      });
-    }
-
-    if (sideUR === 1) {
-      return JoinResult({
-        uL: maybeJoinedUL,
-        u: maybeJoinedU,
-        uR: maybeJoinedUR,
-        c: crossCenter,
-        dL: reverseMiterD,
-        d: reverseMiterD,
-        dR: reverseMiterD,
-        joinUL: joinU,
-        joinUR: joinU,
-        joinDL: false,
-        joinDR: false,
-        situationIndex: 4,
-      });
-    }
-
-    return JoinResult({
-      uL: reverseMiterU,
-      u: reverseMiterU,
-      uR: reverseMiterU,
-      c: crossCenter,
-      dL: maybeJoinedDL,
-      d: maybeJoinedD,
-      dR: maybeJoinedDR,
-      joinUL: false,
-      joinUR: false,
-      joinDL: joinD,
-      joinDR: joinD,
-      situationIndex: 5,
-    });
-  },
-);
-
-const solveMiterJoin = tgpu.fn(
-  [vec2f, vec2f, vec2f, vec2f, vec2f],
-  JoinResult,
-)(
-  (nL, nUL, nUR, nDL, nDR) => {
-    const xL = dot(nL, nUL); // == dot(nL, nDL)
-    const xUR = dot(nL, nUR);
-    const xDR = dot(nL, nDR);
-    const yUR = cross2d(nL, nUR);
-    const yDR = cross2d(nL, nDR);
-    const sideUR = select(f32(-1), f32(1), xUR - xL >= 0);
-    const sideDR = select(f32(-1), f32(1), xDR - xL >= 0);
-
-    const midR = bisectCcw(nUR, nDR);
-    const midL = bisectCcw(nDL, nUL);
-    const reverseMiterU = miterPoint(nUL, nUR);
-    const reverseMiterD = miterPoint(nDR, nDL);
-
-    const miterU = miterLimit(nUR, nUL);
-    const miterD = miterLimit(nDL, nDR);
-
-    if (sideUR === sideDR) {
-      const side = sideUR;
-      const XUR = select(xUR, side * 2 - xUR, yUR < 0);
-      const XDR = select(xDR, side * 2 - xDR, yDR < 0);
-      const clockWise = (side * (XUR - XDR)) <= 0;
-      if (side === 1) {
-        if (clockWise) {
-          return JoinResult({
-            uL: miterU.left,
-            u: miterU.mid,
-            uR: miterU.right,
-            c: midPoint(miterU.mid, miterD.mid),
-            dL: miterD.left,
-            d: miterD.mid,
-            dR: miterD.right,
-            joinUL: false,
-            joinUR: false,
-            joinDL: false,
-            joinDR: false,
-            situationIndex: 0,
-          });
-        }
-        return JoinResult({
-          uL: nUL,
-          u: midR,
-          uR: nUR,
-          c: midR,
-          dL: nDL,
-          d: midR,
-          dR: nDR,
-          joinUL: false,
-          joinUR: false,
-          joinDL: false,
-          joinDR: false,
-          situationIndex: 1,
-        });
-      }
-      // side == -1
-      if (clockWise) {
-        return JoinResult({
-          uL: reverseMiterU,
-          u: reverseMiterU,
-          uR: reverseMiterU,
-          c: midPoint(reverseMiterU, reverseMiterD),
-          dL: reverseMiterD,
-          d: reverseMiterD,
-          dR: reverseMiterD,
-          joinUL: false,
-          joinUR: false,
-          joinDL: false,
-          joinDR: false,
-          situationIndex: 2,
-        });
-      }
-      return JoinResult({
-        uL: nUL,
-        u: midL,
-        uR: nUR,
-        c: midL,
-        dL: nDL,
-        d: midL,
-        dR: nDR,
-        joinUL: false,
-        joinUR: false,
-        joinDL: false,
-        joinDR: false,
-        situationIndex: 3,
-      });
-    }
-
-    if (sideUR === 1) {
-      return JoinResult({
-        uL: miterU.right,
-        u: miterU.mid,
-        uR: miterU.left,
-        c: add(miterU.mid, normalize(sub(reverseMiterD, miterU.mid))),
-        dL: reverseMiterD,
-        d: reverseMiterD,
-        dR: reverseMiterD,
-        joinUL: true,
-        joinUR: true,
-        joinDL: false,
-        joinDR: false,
-        situationIndex: 4,
-      });
-    }
-
-    return JoinResult({
-      uL: reverseMiterU,
-      u: reverseMiterU,
-      uR: reverseMiterU,
-      c: add(miterD.mid, normalize(sub(reverseMiterU, miterD.mid))),
-      dL: miterD.left,
-      d: miterD.mid,
-      dR: miterD.right,
-      joinUL: false,
-      joinUR: false,
-      joinDL: true,
-      joinDR: true,
-      situationIndex: 5,
-    });
-  },
-);
-
-const solveCap = tgpu.fn(
+const solveRoundCap = tgpu.fn(
   [vec2f, vec2f],
   JoinResult,
 )(
@@ -336,6 +36,8 @@ const solveCap = tgpu.fn(
     });
   },
 );
+
+export const joinSlot = tgpu.slot(roundJoin);
 
 const getJoinParent = tgpu.fn([u32], u32)((i) => (i - 4) >> 1);
 
@@ -385,8 +87,8 @@ export const lineSegmentVariableWidth = tgpu.fn([
   const nAB = normalize(AB);
   const nBC = normalize(BC);
 
-  const capB = solveCap(eBC.n1, eBC.n2);
-  let joinB = solveRoundJoin(nAB, eAB.n1, eBC.n1, eAB.n2, eBC.n2);
+  const capB = solveRoundCap(eBC.n1, eBC.n2);
+  let joinB = joinSlot.$(nAB, eAB.n1, eBC.n1, eAB.n2, eBC.n2);
   if (isCapB) {
     joinB = capB;
   }
@@ -397,8 +99,8 @@ export const lineSegmentVariableWidth = tgpu.fn([
   let v3 = addMul(B.position, joinB.d, B.radius);
   let v4 = addMul(B.position, joinB.dR, B.radius);
 
-  const capC = solveCap(eBC.n2, eBC.n1);
-  let joinC = solveRoundJoin(nBC, eBC.n1, eCD.n1, eBC.n2, eCD.n2);
+  const capC = solveRoundCap(eBC.n2, eBC.n1);
+  let joinC = joinSlot.$(nBC, eBC.n1, eCD.n1, eBC.n2, eCD.n2);
   if (isCapC) {
     joinC = capC;
   }
@@ -420,6 +122,7 @@ export const lineSegmentVariableWidth = tgpu.fn([
   v4 = lim38.a;
   v5 = lim38.b;
 
+  // if not a join, these need to be merged after limits are applied
   if (!joinB.joinUR) {
     v1 = v0;
   }
