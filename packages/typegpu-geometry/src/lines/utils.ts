@@ -1,6 +1,7 @@
 import tgpu from 'typegpu';
 import { bool, f32, struct, vec2f } from 'typegpu/data';
 import {
+  add,
   clamp,
   distance,
   dot,
@@ -179,5 +180,45 @@ export const distanceToLineSegment = tgpu.fn([vec2f, vec2f, vec2f], f32)(
     const t = clamp(dot(p, AB) / dot(AB, AB), 0, 1);
     const projP = addMul(A, AB, t);
     return distance(point, projP);
+  },
+);
+
+export const inscribedCenter = tgpu.fn([vec2f, vec2f, vec2f], vec2f)(
+  (a, b, c) => {
+    const ab = sub(b, a);
+    const ac = sub(c, a);
+    const bc = sub(c, b);
+    const lenAB = length(ab);
+    const lenAC = length(ac);
+    const lenBC = length(bc);
+    return mul(
+      add(
+        add(
+          mul(a, lenBC),
+          mul(b, lenAC),
+        ),
+        mul(c, lenAB),
+      ),
+      1 / (lenAB + lenAC + lenBC),
+    );
+  },
+);
+
+export const quadCentroid = tgpu.fn([vec2f, vec2f, vec2f, vec2f], vec2f)(
+  (a, b, c, d) => {
+    const cross0 = cross2d(a, b);
+    const cross1 = cross2d(b, c);
+    const cross2 = cross2d(c, d);
+    const cross3 = cross2d(d, a);
+
+    const area = 0.5 * (cross0 + cross1 + cross2 + cross3);
+    const factor = (1.0 / 6.0) / area;
+
+    let sum = mul(add(a, b), cross0);
+    sum = add(sum, mul(add(b, c), cross1));
+    sum = add(sum, mul(add(c, d), cross2));
+    sum = add(sum, mul(add(d, a), cross3));
+
+    return mul(sum, factor);
   },
 );

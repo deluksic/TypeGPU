@@ -1,6 +1,6 @@
 import tgpu from 'typegpu';
 import { bool, f32, struct, u32, vec2f } from 'typegpu/data';
-import type { v2f } from 'typegpu/data';
+import type { Infer, v2f } from 'typegpu/data';
 import { add, dot, mul, normalize, select, sub } from 'typegpu/std';
 import {
   addMul,
@@ -13,6 +13,7 @@ import {
 } from '../utils.ts';
 import {
   externalNormals,
+  intersectLines,
   limitTowardsMiddle,
   miterLimit,
   miterPoint,
@@ -20,6 +21,7 @@ import {
 
 const JOIN_LIMIT = tgpu['~unstable'].const(f32, 0.999);
 
+type JoinResult = Infer<typeof JoinResult>;
 const JoinResult = struct({
   uL: vec2f,
   u: vec2f,
@@ -47,7 +49,6 @@ const solveRoundJoin = tgpu.fn(
     const yDR = cross2d(nL, nDR);
     const sideUR = select(f32(-1), f32(1), xUR - xL >= 0);
     const sideDR = select(f32(-1), f32(1), xDR - xL >= 0);
-    const center = mul(add(add(nUL, nUR), add(nDL, nDR)), 0.25);
 
     const midU = bisectCcw(nUR, nUL);
     const midD = bisectCcw(nDL, nDR);
@@ -61,6 +62,29 @@ const solveRoundJoin = tgpu.fn(
     const midpU = midPoint(nUL, nUR);
     const midpD = midPoint(nDL, nDR);
 
+    const maybeJoinedUL = select(midpU, nUL, joinU);
+    const maybeJoinedU = select(midpU, midU, joinU);
+    const maybeJoinedUR = select(midpU, nUR, joinU);
+    const maybeJoinedDL = select(midpD, nDL, joinD);
+    const maybeJoinedD = select(midpD, midD, joinD);
+    const maybeJoinedDR = select(midpD, nDR, joinD);
+
+    const center = mul(
+      add(
+        add(
+          maybeJoinedUR,
+          maybeJoinedUL,
+        ),
+        add(
+          maybeJoinedDL,
+          maybeJoinedDR,
+        ),
+      ),
+      0.25,
+    );
+
+    const crossCenter = intersectLines(nUL, nDL, nUR, nDR).point;
+
     if (sideUR === sideDR) {
       const side = sideUR;
       const XUR = select(xUR, side * 2 - xUR, yUR < 0);
@@ -69,13 +93,13 @@ const solveRoundJoin = tgpu.fn(
       if (side === 1) {
         if (clockWise) {
           return JoinResult({
-            uL: select(midpU, nUL, joinU),
-            u: select(midpU, midU, joinU),
-            uR: select(midpU, nUR, joinU),
+            uL: maybeJoinedUL,
+            u: maybeJoinedU,
+            uR: maybeJoinedUR,
             c: center,
-            dL: select(midpD, nDL, joinD),
-            d: select(midpD, midD, joinD),
-            dR: select(midpD, nDR, joinD),
+            dL: maybeJoinedDL,
+            d: maybeJoinedD,
+            dR: maybeJoinedDR,
             joinUL: joinU,
             joinUR: joinU,
             joinDL: joinD,
@@ -133,10 +157,10 @@ const solveRoundJoin = tgpu.fn(
 
     if (sideUR === 1) {
       return JoinResult({
-        uL: select(midpU, nUL, joinU),
-        u: select(midpU, midU, joinU),
-        uR: select(midpU, nUR, joinU),
-        c: center,
+        uL: maybeJoinedUL,
+        u: maybeJoinedU,
+        uR: maybeJoinedUR,
+        c: crossCenter,
         dL: reverseMiterD,
         d: reverseMiterD,
         dR: reverseMiterD,
@@ -152,10 +176,10 @@ const solveRoundJoin = tgpu.fn(
       uL: reverseMiterU,
       u: reverseMiterU,
       uR: reverseMiterU,
-      c: center,
-      dL: select(midpD, nDL, joinD),
-      d: select(midpD, midD, joinD),
-      dR: select(midpD, nDR, joinD),
+      c: crossCenter,
+      dL: maybeJoinedDL,
+      d: maybeJoinedD,
+      dR: maybeJoinedDR,
       joinUL: false,
       joinUR: false,
       joinDL: joinD,
@@ -313,11 +337,14 @@ const solveCap = tgpu.fn(
   },
 );
 
+const getJoinParent = tgpu.fn([u32], u32)((i) => (i - 4) >> 1);
+
 const LineSegmentOutput = struct({
   vertexPosition: vec2f,
   situationIndex: u32,
 });
 
+type LineSegmentVertex = Infer<typeof LineSegmentVertex>;
 export const LineSegmentVertex = struct({
   position: vec2f,
   radius: f32,
@@ -339,7 +366,7 @@ export const lineSegmentVariableWidth = tgpu.fn([
   const radiusCDDelta = C.radius - D.radius;
 
   // segments where one end completely contains the other are skipped
-  // TODO: we should probably render a circle in case one of the ends is a cap
+  // TODO: we should probably render a circle in some cases
   if (dot(BC, BC) <= radiusBCDelta * radiusBCDelta) {
     return {
       vertexPosition: vec2f(0, 0),
@@ -359,7 +386,7 @@ export const lineSegmentVariableWidth = tgpu.fn([
   const nBC = normalize(BC);
 
   const capB = solveCap(eBC.n1, eBC.n2);
-  let joinB = solveMiterJoin(nAB, eAB.n1, eBC.n1, eAB.n2, eBC.n2);
+  let joinB = solveRoundJoin(nAB, eAB.n1, eBC.n1, eAB.n2, eBC.n2);
   if (isCapB) {
     joinB = capB;
   }
@@ -371,7 +398,7 @@ export const lineSegmentVariableWidth = tgpu.fn([
   let v4 = addMul(B.position, joinB.dR, B.radius);
 
   const capC = solveCap(eBC.n2, eBC.n1);
-  let joinC = solveMiterJoin(nBC, eBC.n1, eCD.n1, eBC.n2, eCD.n2);
+  let joinC = solveRoundJoin(nBC, eBC.n1, eCD.n1, eBC.n2, eCD.n2);
   if (isCapC) {
     joinC = capC;
   }
@@ -414,58 +441,63 @@ export const lineSegmentVariableWidth = tgpu.fn([
     v7 = v9;
   }
 
-  let d10 = joinB.u;
-  let d11 = joinB.d;
-  let d12 = joinC.u;
-  let d13 = joinC.d;
-  let d14 = joinB.u;
-  let d15 = joinB.u;
-  let d16 = joinB.d;
-  let d17 = joinB.d;
-  let d18 = joinC.u;
-  let d19 = joinC.u;
-  let d20 = joinC.d;
-  let d21 = joinC.d;
+  const points = [v0, v1, v2, v3, v4, v5, v6, v7, v8, v9];
 
-  if (joinB.joinUR) {
-    d10 = bisectCcw(joinB.uR, joinB.u);
-    d14 = bisectNoCheck(d10, joinB.u);
-    d15 = bisectNoCheck(joinB.uR, d10);
-  }
-  if (joinB.joinDR) {
-    d11 = bisectCcw(joinB.d, joinB.dR);
-    d16 = bisectNoCheck(d11, joinB.dR);
-    d17 = bisectNoCheck(joinB.d, d11);
-  }
-  if (joinC.joinUL) {
-    d12 = bisectCcw(joinC.u, joinC.uL);
-    d18 = bisectNoCheck(joinC.u, d12);
-    d19 = bisectNoCheck(d12, joinC.uL);
-  }
-  if (joinC.joinDL) {
-    d13 = bisectCcw(joinC.dL, joinC.d);
-    d20 = bisectNoCheck(joinC.dL, d13);
-    d21 = bisectNoCheck(d13, joinC.d);
+  if (vertexIndex < 10) {
+    return {
+      vertexPosition: points[vertexIndex] as v2f,
+      situationIndex: joinB.situationIndex,
+    };
   }
 
-  const v10 = addMul(B.position, d10, B.radius);
-  const v11 = addMul(B.position, d11, B.radius);
-  const v12 = addMul(C.position, d12, C.radius);
-  const v13 = addMul(C.position, d13, C.radius);
-  const v14 = addMul(B.position, d14, B.radius);
-  const v15 = addMul(B.position, d15, B.radius);
-  const v16 = addMul(B.position, d16, B.radius);
-  const v17 = addMul(B.position, d17, B.radius);
-  const v18 = addMul(C.position, d18, C.radius);
-  const v19 = addMul(C.position, d19, C.radius);
-  const v20 = addMul(C.position, d20, C.radius);
-  const v21 = addMul(C.position, d21, C.radius);
+  const shouldJoin = [
+    u32(joinB.joinUR),
+    u32(joinB.joinDR),
+    u32(joinC.joinDL),
+    u32(joinC.joinUL),
+  ];
 
   // deno-fmt-ignore
-  const points = [v0, v1, v2, v3, v4, v5, v6, v7, v8, v9, v10, v11, v12, v13, v14, v15, v16, v17, v18, v19, v20, v21];
+  const parents = [
+    joinB.uR, joinB.u,
+    joinB.d, joinB.dR,
+    joinC.dL, joinC.d,
+    joinC.u, joinC.uL,
+  ];
 
+  const noJoinPoints = [v0, v4, v5, v9];
+
+  let i = vertexIndex - 10;
+  let depth = u32(0);
+  let path = u32(0);
+  while (i >= 4) {
+    path = (path << 1) | (i & 1);
+    i = getJoinParent(i);
+    depth += 1;
+  }
+  let lineVertex = B;
+  if (i >= 2) {
+    lineVertex = C;
+  }
+  if (shouldJoin[i] === 0) {
+    return {
+      situationIndex: joinB.situationIndex,
+      vertexPosition: noJoinPoints[i] as v2f,
+    };
+  }
+  let d0 = parents[i * 2] as v2f;
+  let d1 = parents[i * 2 + 1] as v2f;
+  let d = bisectCcw(d0, d1);
+  while (depth > 0) {
+    const isLeftChild = (path & 1) === 0;
+    path = path >> 1;
+    depth -= 1;
+    d0 = select(d, d0, isLeftChild);
+    d1 = select(d1, d, isLeftChild);
+    d = bisectNoCheck(d0, d1);
+  }
   return {
-    vertexPosition: points[vertexIndex] as v2f,
     situationIndex: joinB.situationIndex,
+    vertexPosition: addMul(lineVertex.position, d, lineVertex.radius),
   };
 });

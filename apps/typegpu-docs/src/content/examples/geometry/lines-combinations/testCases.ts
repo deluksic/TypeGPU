@@ -97,7 +97,8 @@ export const case5 = testCaseShell(
 export const perlinTraces = testCaseShell(
   (vertexIndex, t) => {
     'kernel';
-    const i = f32(max(vertexIndex, 0)) / 100;
+    const perLine = u32(200);
+    const i = f32(max(vertexIndex, 0)) / f32(perLine);
     const n = floor(i);
     const x = 2 * (i - n) - 1;
     const y = 0.125 * n - 0.5 +
@@ -107,7 +108,7 @@ export const perlinTraces = testCaseShell(
       0.0625 * perlin2d.sample(vec2f(16 * x, t + 300 + 0.3 * n));
     return LineSegmentVertex({
       position: vec2f(0.8 * x, y),
-      radius: select(0.002 * (n + 1), -1, vertexIndex % 100 === 0),
+      radius: select(0.002 * (n + 1), -1, vertexIndex % perLine === 0),
     });
   },
 );
@@ -143,13 +144,13 @@ export const armsSmall = testCaseShell(
   },
 );
 
-export const zarmsBig = testCaseShell(
+export const armsBig = testCaseShell(
   (vertexIndex, t) => {
     'kernel';
     const result = arms(vertexIndex, t);
     return LineSegmentVertex({
       position: result.position,
-      radius: select(0.2, 0.1, vertexIndex === 2 || vertexIndex === 3),
+      radius: select(0.275, 0.1, vertexIndex === 2 || vertexIndex === 3),
     });
   },
 );

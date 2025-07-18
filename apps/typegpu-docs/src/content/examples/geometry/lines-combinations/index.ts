@@ -2,11 +2,9 @@ import tgpu from 'typegpu';
 import type { ColorAttachment } from '../../../../../../../packages/typegpu/src/core/pipeline/renderPipeline.ts';
 import { clamp, cos, min, mix, select, sin } from 'typegpu/std';
 import {
-  lineSegmentIndicesCapLevel0,
-  lineSegmentIndicesCapLevel2,
+  lineSegmentIndicesCapLevel3,
   lineSegmentVariableWidth,
-  lineSegmentWireframeIndicesCapLevel0,
-  lineSegmentWireframeIndicesCapLevel2,
+  lineSegmentWireframeIndicesCapLevel3,
 } from '@typegpu/geometry';
 import { addMul } from '../../../../../../../packages/typegpu-geometry/src/utils.ts';
 import {
@@ -70,13 +68,13 @@ const uniformsBindGroup = root.createBindGroup(bindGroupLayout, {
 });
 
 const indexBuffer = root.createBuffer(
-  arrayOf(u16, lineSegmentIndicesCapLevel2.length),
-  lineSegmentIndicesCapLevel2,
+  arrayOf(u16, lineSegmentIndicesCapLevel3.length),
+  lineSegmentIndicesCapLevel3,
 ).$usage('index');
 
 const outlineIndexBuffer = root.createBuffer(
-  arrayOf(u16, lineSegmentWireframeIndicesCapLevel2.length),
-  lineSegmentWireframeIndicesCapLevel2,
+  arrayOf(u16, lineSegmentWireframeIndicesCapLevel3.length),
+  lineSegmentWireframeIndicesCapLevel3,
 ).$usage('index');
 
 const testCaseSlot = tgpu.slot(testCases.arms);
@@ -271,7 +269,7 @@ function createPipelines() {
       blend: alphaBlend,
     })
     .withPrimitive({
-      cullMode: 'back',
+      // cullMode: 'back',
     })
     .createPipeline()
     .withIndexBuffer(indexBuffer);
@@ -328,7 +326,7 @@ let wireframe = true;
 let fillType = 1;
 let animationSpeed = 1;
 let reverse = false;
-const INSTANCE_COUNT = 1000;
+const INSTANCE_COUNT = 2000;
 
 const draw = (timeMs: number) => {
   uniformsBuffer.writePartial({
@@ -344,7 +342,12 @@ const draw = (timeMs: number) => {
     pipelines.fill
       .with(bindGroupLayout, uniformsBindGroup)
       .withColorAttachment({ ...colorAttachment, loadOp: 'clear' })
-      .drawIndexed(lineSegmentIndicesCapLevel0.length, INSTANCE_COUNT);
+      .withPerformanceCallback((start, end) => {
+        if (frameId % 20 === 0) {
+          console.log(`${(Number(end - start) * 1e-6).toFixed(2)} ms`);
+        }
+      })
+      .drawIndexed(lineSegmentIndicesCapLevel3.length, INSTANCE_COUNT);
   }
 
   if (wireframe) {
@@ -354,7 +357,7 @@ const draw = (timeMs: number) => {
         ...colorAttachment,
         loadOp: fillType === 0 ? 'clear' : 'load',
       })
-      .drawIndexed(lineSegmentWireframeIndicesCapLevel0.length, INSTANCE_COUNT);
+      .drawIndexed(lineSegmentWireframeIndicesCapLevel3.length, INSTANCE_COUNT);
   }
   if (showRadii) {
     pipelines.circles
@@ -371,10 +374,11 @@ const draw = (timeMs: number) => {
 
 let time = 0;
 let lastFrameTime = 0;
+let frameId = -1;
 const runAnimationFrame = (timeMs: number) => {
   const deltaTime = timeMs - lastFrameTime;
   draw(time);
-  requestAnimationFrame(runAnimationFrame);
+  frameId = requestAnimationFrame(runAnimationFrame);
   time += deltaTime * animationSpeed * (reverse ? -1 : 1);
   lastFrameTime = timeMs;
 };
@@ -436,4 +440,5 @@ export const controls = {
 
 export function onCleanup() {
   root.destroy();
+  cancelAnimationFrame(frameId);
 }
