@@ -2,11 +2,14 @@ import tgpu from 'typegpu';
 import type { ColorAttachment } from '../../../../../../../packages/typegpu/src/core/pipeline/renderPipeline.ts';
 import { clamp, cos, min, mix, select, sin } from 'typegpu/std';
 import {
+  endCapSlot,
   joinSlot,
+  lineCaps,
   lineJoins,
   lineSegmentIndicesCapLevel3,
   lineSegmentVariableWidth,
   lineSegmentWireframeIndicesCapLevel3,
+  startCapSlot,
 } from '@typegpu/geometry';
 import { addMul } from '../../../../../../../packages/typegpu-geometry/src/utils.ts';
 import {
@@ -96,13 +99,13 @@ const mainVertex = tgpu['~unstable'].vertexFn({
   },
 })(({ vertexIndex, instanceIndex }) => {
   const t = bindGroupLayout.$.uniforms.time;
-  let A = testCaseSlot.$(instanceIndex, t);
+  const A = testCaseSlot.$(instanceIndex, t);
   const B = testCaseSlot.$(instanceIndex + 1, t);
   const C = testCaseSlot.$(instanceIndex + 2, t);
-  let D = testCaseSlot.$(instanceIndex + 3, t);
+  const D = testCaseSlot.$(instanceIndex + 3, t);
 
-  // disconnect or cap lines if radius is < 0
-  if (B.radius < 0 || C.radius < 0) {
+  // disconnect lines if radius is < 0
+  if (A.radius < 0 || B.radius < 0 || C.radius < 0 || D.radius < 0) {
     return {
       outPos: vec4f(),
       position: vec2f(),
@@ -110,12 +113,6 @@ const mainVertex = tgpu['~unstable'].vertexFn({
       vertexIndex: 0,
       situationIndex: 0,
     };
-  }
-  if (A.radius < 0) {
-    A = B;
-  }
-  if (D.radius < 0) {
-    D = C;
   }
 
   const result = lineSegmentVariableWidth(vertexIndex, A, B, C, D);
@@ -265,10 +262,14 @@ const circlesVertex = tgpu['~unstable'].vertexFn({
 
 let testCase = testCases.arms;
 let join = lineJoins.round;
+let startCap = lineCaps.round;
+let endCap = lineCaps.round;
 
 function createPipelines() {
   const fill = root['~unstable']
     .with(joinSlot, join)
+    .with(startCapSlot, startCap)
+    .with(endCapSlot, endCap)
     .with(testCaseSlot, testCase)
     .withVertex(mainVertex, {})
     .withFragment(mainFragment, {
@@ -283,6 +284,8 @@ function createPipelines() {
 
   const outline = root['~unstable']
     .with(joinSlot, join)
+    .with(startCapSlot, startCap)
+    .with(endCapSlot, endCap)
     .with(testCaseSlot, testCase)
     .withVertex(mainVertex, {})
     .withFragment(outlineFragment, {
@@ -406,6 +409,22 @@ export const controls = {
     options: Object.keys(testCases),
     onSelectChange: async (selected: keyof typeof testCases) => {
       testCase = testCases[selected];
+      pipelines = createPipelines();
+    },
+  },
+  'Start Cap': {
+    initial: 'round',
+    options: Object.keys(lineCaps),
+    onSelectChange: async (selected: keyof typeof lineCaps) => {
+      startCap = lineCaps[selected];
+      pipelines = createPipelines();
+    },
+  },
+  'End Cap': {
+    initial: 'round',
+    options: Object.keys(lineCaps),
+    onSelectChange: async (selected: keyof typeof lineCaps) => {
+      endCap = lineCaps[selected];
       pipelines = createPipelines();
     },
   },

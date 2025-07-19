@@ -1,7 +1,7 @@
 import tgpu from 'typegpu';
 import { f32, struct, u32, vec2f } from 'typegpu/data';
 import type { Infer, v2f } from 'typegpu/data';
-import { dot, normalize, select, sub } from 'typegpu/std';
+import { dot, mul, normalize, select, sub } from 'typegpu/std';
 import {
   addMul,
   bisectCcw,
@@ -11,35 +11,31 @@ import {
   rot90cw,
 } from '../utils.ts';
 import { externalNormals, limitTowardsMiddle } from './utils.ts';
-import { JoinResult } from './types.ts';
 import { roundJoin } from './joins/round.ts';
-
-const solveRoundCap = tgpu.fn(
-  [vec2f, vec2f],
-  JoinResult,
-)(
-  (a, b) => {
-    const mid = bisectCcw(a, b);
-    return JoinResult({
-      uL: b,
-      u: mid,
-      uR: a,
-      c: mid,
-      dL: a,
-      d: mid,
-      dR: b,
-      joinUL: true,
-      joinUR: true,
-      joinDL: true,
-      joinDR: true,
-      situationIndex: 0,
-    });
-  },
-);
+import { roundCap } from './caps/round.ts';
+import { JoinPath } from './types.ts';
 
 export const joinSlot = tgpu.slot(roundJoin);
+export const startCapSlot = tgpu.slot(roundCap);
+export const endCapSlot = tgpu.slot(roundCap);
 
 const getJoinParent = tgpu.fn([u32], u32)((i) => (i - 4) >> 1);
+
+const getJoinPath = tgpu.fn([u32], JoinPath)((vertexIndex) => {
+  let i = vertexIndex - 10;
+  let depth = u32(0);
+  let path = u32(0);
+  while (i >= 4) {
+    path = (path << 1) | (i & 1);
+    i = getJoinParent(i);
+    depth += 1;
+  }
+  return JoinPath({
+    joinIndex: i,
+    path,
+    depth,
+  });
+});
 
 const LineSegmentOutput = struct({
   vertexPosition: vec2f,
@@ -59,6 +55,8 @@ export const lineSegmentVariableWidth = tgpu.fn([
   LineSegmentVertex,
   LineSegmentVertex,
 ], LineSegmentOutput)((vertexIndex, A, B, C, D) => {
+  const joinPath = getJoinPath(vertexIndex);
+
   const AB = sub(B.position, A.position);
   const BC = sub(C.position, B.position);
   const CD = sub(D.position, C.position);
@@ -87,7 +85,7 @@ export const lineSegmentVariableWidth = tgpu.fn([
   const nAB = normalize(AB);
   const nBC = normalize(BC);
 
-  const capB = solveRoundCap(eBC.n1, eBC.n2);
+  const capB = startCapSlot.$(mul(nBC, -1), eBC.n1, eBC.n2);
   let joinB = joinSlot.$(nAB, eAB.n1, eBC.n1, eAB.n2, eBC.n2);
   if (isCapB) {
     joinB = capB;
@@ -99,7 +97,7 @@ export const lineSegmentVariableWidth = tgpu.fn([
   let v3 = addMul(B.position, joinB.d, B.radius);
   let v4 = addMul(B.position, joinB.dR, B.radius);
 
-  const capC = solveRoundCap(eBC.n2, eBC.n1);
+  const capC = endCapSlot.$(nBC, eBC.n2, eBC.n1);
   let joinC = joinSlot.$(nBC, eBC.n1, eCD.n1, eBC.n2, eCD.n2);
   if (isCapC) {
     joinC = capC;
@@ -170,27 +168,23 @@ export const lineSegmentVariableWidth = tgpu.fn([
 
   const noJoinPoints = [v0, v4, v5, v9];
 
-  let i = vertexIndex - 10;
-  let depth = u32(0);
-  let path = u32(0);
-  while (i >= 4) {
-    path = (path << 1) | (i & 1);
-    i = getJoinParent(i);
-    depth += 1;
-  }
-  let lineVertex = B;
-  if (i >= 2) {
-    lineVertex = C;
-  }
-  if (shouldJoin[i] === 0) {
+  const joinIndex = joinPath.joinIndex;
+  if (shouldJoin[joinPath.joinIndex] === 0) {
     return {
       situationIndex: joinB.situationIndex,
-      vertexPosition: noJoinPoints[i] as v2f,
+      vertexPosition: noJoinPoints[joinPath.joinIndex] as v2f,
     };
   }
-  let d0 = parents[i * 2] as v2f;
-  let d1 = parents[i * 2 + 1] as v2f;
+
+  let lineVertex = B;
+  if (joinPath.joinIndex >= 2) {
+    lineVertex = C;
+  }
+  let d0 = parents[joinIndex * 2] as v2f;
+  let d1 = parents[joinIndex * 2 + 1] as v2f;
   let d = bisectCcw(d0, d1);
+  let depth = joinPath.depth;
+  let path = joinPath.path;
   while (depth > 0) {
     const isLeftChild = (path & 1) === 0;
     path = path >> 1;

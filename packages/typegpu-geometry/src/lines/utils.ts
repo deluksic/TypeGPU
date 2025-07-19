@@ -6,10 +6,10 @@ import {
   distance,
   dot,
   length,
+  max,
   mix,
   mul,
   normalize,
-  select,
   sqrt,
   sub,
 } from 'typegpu/std';
@@ -21,6 +21,15 @@ import {
   rot90ccw,
   rot90cw,
 } from '../utils.ts';
+
+/**
+ * Finds the miter point of tangents to two points on a circle.
+ * The miter point is on the smaller arc.
+ */
+export const miterPointNoCheck = tgpu.fn([vec2f, vec2f], vec2f)((a, b) => {
+  const ab = add(a, b);
+  return mul(ab, 2 / dot(ab, ab));
+});
 
 /**
  * Finds the miter point of tangents to two points on respective circles.
@@ -102,28 +111,15 @@ export const externalNormals = tgpu.fn(
 )((distance, r1, r2) => {
   const dNorm = normalize(distance);
   const expCos = (r1 - r2) / length(distance);
-  const expSin = sqrt(1 - expCos * expCos);
-  const t1 = vec2f(
-    dNorm.x * expCos - dNorm.y * expSin,
-    dNorm.x * expSin + dNorm.y * expCos,
-  );
-  const t2 = vec2f(
-    dNorm.x * expCos + dNorm.y * expSin,
-    -dNorm.x * expSin + dNorm.y * expCos,
-  );
-  return ExternalNormals({ n1: t1, n2: t2 });
+  const expSin = sqrt(max(0, 1 - expCos * expCos));
+  const a = dNorm.x * expCos;
+  const b = dNorm.y * expSin;
+  const c = dNorm.x * expSin;
+  const d = dNorm.y * expCos;
+  const n1 = vec2f(a - b, c + d);
+  const n2 = vec2f(a + b, -c + d);
+  return ExternalNormals({ n1, n2 });
 });
-
-/**
- * Selects either a or b, depending which one is earlier along dir
- */
-export const limitAlong = tgpu.fn([vec2f, vec2f, vec2f, bool], vec2f)(
-  (a, b, dir, invert) => {
-    const dotA = dot(a, dir);
-    const dotB = dot(b, dir);
-    return select(a, b, (dotA >= dotB) === invert);
-  },
-);
 
 const Intersection = struct({
   valid: bool,
@@ -135,16 +131,16 @@ export const intersectLines = tgpu.fn(
   [vec2f, vec2f, vec2f, vec2f],
   Intersection,
 )(
-  (a, b, c, d) => {
-    const r = sub(b, a);
-    const s = sub(d, c);
-    const rxs = r.x * s.y - r.y * s.x;
-    const AC = sub(c, a);
-    const t = (AC.x * s.y - AC.y * s.x) / rxs;
+  (A1, A2, B1, B2) => {
+    const a = sub(A2, A1);
+    const b = sub(B2, B1);
+    const axb = cross2d(a, b);
+    const AB = sub(B1, A1);
+    const t = cross2d(AB, b) / axb;
     return {
-      valid: rxs !== 0,
+      valid: axb !== 0,
       t,
-      point: addMul(a, r, t),
+      point: addMul(A1, a, t),
     };
   },
 );
@@ -161,9 +157,9 @@ export const limitTowardsMiddle = tgpu.fn(
   [vec2f, vec2f, vec2f, vec2f],
   LimitAlongResult,
 )(
-  (M, dir, p1, p2) => {
-    const t1 = dot(sub(p1, M), dir);
-    const t2 = dot(sub(p2, M), dir);
+  (middle, dir, p1, p2) => {
+    const t1 = dot(sub(p1, middle), dir);
+    const t2 = dot(sub(p2, middle), dir);
     if (t1 < t2) {
       return LimitAlongResult({ a: p1, b: p2 });
     }
@@ -180,45 +176,5 @@ export const distanceToLineSegment = tgpu.fn([vec2f, vec2f, vec2f], f32)(
     const t = clamp(dot(p, AB) / dot(AB, AB), 0, 1);
     const projP = addMul(A, AB, t);
     return distance(point, projP);
-  },
-);
-
-export const inscribedCenter = tgpu.fn([vec2f, vec2f, vec2f], vec2f)(
-  (a, b, c) => {
-    const ab = sub(b, a);
-    const ac = sub(c, a);
-    const bc = sub(c, b);
-    const lenAB = length(ab);
-    const lenAC = length(ac);
-    const lenBC = length(bc);
-    return mul(
-      add(
-        add(
-          mul(a, lenBC),
-          mul(b, lenAC),
-        ),
-        mul(c, lenAB),
-      ),
-      1 / (lenAB + lenAC + lenBC),
-    );
-  },
-);
-
-export const quadCentroid = tgpu.fn([vec2f, vec2f, vec2f, vec2f], vec2f)(
-  (a, b, c, d) => {
-    const cross0 = cross2d(a, b);
-    const cross1 = cross2d(b, c);
-    const cross2 = cross2d(c, d);
-    const cross3 = cross2d(d, a);
-
-    const area = 0.5 * (cross0 + cross1 + cross2 + cross3);
-    const factor = (1.0 / 6.0) / area;
-
-    let sum = mul(add(a, b), cross0);
-    sum = add(sum, mul(add(b, c), cross1));
-    sum = add(sum, mul(add(c, d), cross2));
-    sum = add(sum, mul(add(d, a), cross3));
-
-    return mul(sum, factor);
   },
 );

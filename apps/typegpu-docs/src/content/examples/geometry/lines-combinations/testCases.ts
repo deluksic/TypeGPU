@@ -1,9 +1,23 @@
 import { LineSegmentVertex } from '@typegpu/geometry';
 import { perlin2d } from '@typegpu/noise';
 import tgpu from 'typegpu';
-import { arrayOf, f32, i32, u32, vec2f } from 'typegpu/data';
-import { clamp, cos, floor, max, pow, select, sin } from 'typegpu/std';
+import { arrayOf, f32, i32, mat2x2f, u32, vec2f } from 'typegpu/data';
+import {
+  add,
+  clamp,
+  cos,
+  floor,
+  max,
+  mul,
+  pow,
+  select,
+  sin,
+} from 'typegpu/std';
 import { TEST_SEGMENT_COUNT } from './constants.ts';
+import {
+  randFloat01,
+  randSeed,
+} from '../../../../../../../packages/typegpu-noise/src/random.ts';
 
 const testCaseShell = tgpu.fn([u32, f32], LineSegmentVertex);
 
@@ -152,7 +166,7 @@ export const arms = testCaseShell(
   },
 );
 
-export const aaarmsSmall = testCaseShell(
+export const armsSmall = testCaseShell(
   (vertexIndex, t) => {
     'kernel';
     const result = arms(vertexIndex, t);
@@ -170,6 +184,59 @@ export const armsBig = testCaseShell(
     return LineSegmentVertex({
       position: result.position,
       radius: select(0.275, 0.1, vertexIndex === 2 || vertexIndex === 3),
+    });
+  },
+);
+
+export const armsRotating = testCaseShell(
+  (vertexIndex, t) => {
+    'kernel';
+    const s = sin(t);
+    const c = cos(t);
+    const r = 0.25;
+    const points = [
+      vec2f(r * s - 0.25, r * c),
+      vec2f(-0.25, 0),
+      vec2f(0.25, 0),
+      vec2f(-r * s + 0.25, -r * c),
+    ];
+    const i = clamp(i32(vertexIndex) - 1, 0, 3);
+    return LineSegmentVertex({
+      position: points[i],
+      radius: 0.2,
+    });
+  },
+);
+
+export const flyingSquares = testCaseShell(
+  (vertexIndex, t) => {
+    'kernel';
+    const squareIndex = vertexIndex / 8;
+    randSeed(f32(squareIndex));
+    const squarePoints = [
+      vec2f(-1, -1),
+      vec2f(1, -1),
+      vec2f(1, 1),
+      vec2f(-1, 1),
+    ];
+    const pointIndex = vertexIndex % 8;
+    const point = squarePoints[pointIndex % 4];
+    const rotationSpeed = 2 * randFloat01() - 1;
+    const s = sin(t * rotationSpeed);
+    const c = cos(t * rotationSpeed);
+    const rotate = mat2x2f(c, -s, s, c);
+    const r = 0.1 + 0.05 * randFloat01();
+    // TODO: why do I need to wrap with f32?
+    const x = f32(2.0 * randFloat01() - 1);
+    const y = f32(2.0 * randFloat01() - 1);
+    const transformedPoint = add(vec2f(x, y), mul(rotate, mul(point, r)));
+    return LineSegmentVertex({
+      position: transformedPoint,
+      radius: select(
+        0.1 * r + 0.05 * randFloat01(),
+        -1,
+        pointIndex === 7 || squareIndex > 50,
+      ),
     });
   },
 );
