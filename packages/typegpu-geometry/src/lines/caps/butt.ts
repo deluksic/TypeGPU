@@ -1,35 +1,38 @@
 import tgpu from 'typegpu';
 import { vec2f } from 'typegpu/data';
-import { rot90ccw } from '../../utils.ts';
-import { JoinResult } from '../types.ts';
-import { dot, mul } from 'typegpu/std';
-
-const project = tgpu.fn([vec2f, vec2f], vec2f)((a, n) => {
-  const cos_ = dot(a, n);
-  return mul(n, 1 / cos_);
-});
+import { rot90ccw, rot90cw } from '../../utils.ts';
+import { CapResult } from '../types.ts';
+import { dot, select } from 'typegpu/std';
+import { intersectTangent, miterPointNoCheck } from '../utils.ts';
 
 export const buttCap = tgpu.fn(
   [vec2f, vec2f, vec2f],
-  JoinResult,
+  CapResult,
 )(
-  (dir, a, b) => {
-    const zeroAxis = rot90ccw(dir);
-    const miterA = project(a, zeroAxis);
-    const miterB = project(b, zeroAxis);
-    return JoinResult({
-      uL: miterB,
-      u: vec2f(0, 0),
-      uR: miterA,
-      c: vec2f(0, 0),
-      dL: miterA,
-      d: vec2f(0, 0),
-      dR: miterB,
-      joinUL: false,
-      joinUR: false,
-      joinDL: false,
-      joinDR: false,
-      situationIndex: 0,
+  (right, dir, left) => {
+    const shouldJoin = dot(dir, right) < 0;
+    const dirRight = rot90cw(dir);
+    const dirLeft = rot90ccw(dir);
+    const miterR = miterPointNoCheck(right, dirRight);
+    const miterL = miterPointNoCheck(dirLeft, left);
+    const rightForward = select(
+      intersectTangent(right, dirRight),
+      dirRight,
+      shouldJoin,
+    );
+    const leftForward = select(
+      intersectTangent(left, dirLeft),
+      dirLeft,
+      shouldJoin,
+    );
+    return CapResult({
+      right: select(rightForward, right, shouldJoin),
+      rightForward,
+      forward: vec2f(0, 0),
+      leftForward,
+      left: select(leftForward, left, shouldJoin),
+      joinRight: true,
+      joinLeft: true,
     });
   },
 );

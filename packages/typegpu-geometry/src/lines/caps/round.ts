@@ -1,27 +1,22 @@
 import tgpu from 'typegpu';
 import { vec2f } from 'typegpu/data';
 import { bisectCcw } from '../../utils.ts';
-import { JoinResult } from '../types.ts';
+import { CapResult } from '../types.ts';
 
 export const roundCap = tgpu.fn(
   [vec2f, vec2f, vec2f],
-  JoinResult,
+  CapResult,
 )(
-  (_dir, a, b) => {
-    const mid = bisectCcw(a, b);
-    return JoinResult({
-      uL: b,
-      u: mid,
-      uR: a,
-      c: mid,
-      dL: a,
-      d: mid,
-      dR: b,
-      joinUL: true,
-      joinUR: true,
-      joinDL: true,
-      joinDR: true,
-      situationIndex: 0,
+  (right, _dir, left) => {
+    const mid = bisectCcw(right, left);
+    return CapResult({
+      right,
+      rightForward: mid,
+      forward: mid,
+      leftForward: mid,
+      left,
+      joinRight: true,
+      joinLeft: true,
     });
   },
 );

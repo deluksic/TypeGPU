@@ -85,10 +85,16 @@ export const lineSegmentVariableWidth = tgpu.fn([
   const nAB = normalize(AB);
   const nBC = normalize(BC);
 
-  const capB = startCapSlot.$(mul(nBC, -1), eBC.n1, eBC.n2);
-  let joinB = joinSlot.$(nAB, eAB.n1, eBC.n1, eAB.n2, eBC.n2);
+  const capB = startCapSlot.$(eBC.n1, mul(nBC, -1), eBC.n2);
+  const joinB = joinSlot.$(nAB, eAB.n1, eBC.n1, eAB.n2, eBC.n2);
   if (isCapB) {
-    joinB = capB;
+    joinB.uR = capB.right;
+    joinB.u = capB.rightForward;
+    joinB.c = capB.forward;
+    joinB.d = capB.leftForward;
+    joinB.dR = capB.left;
+    joinB.joinUR = capB.joinRight;
+    joinB.joinDR = capB.joinLeft;
   }
 
   let v0 = addMul(B.position, joinB.uR, B.radius);
@@ -97,10 +103,16 @@ export const lineSegmentVariableWidth = tgpu.fn([
   let v3 = addMul(B.position, joinB.d, B.radius);
   let v4 = addMul(B.position, joinB.dR, B.radius);
 
-  const capC = endCapSlot.$(nBC, eBC.n2, eBC.n1);
-  let joinC = joinSlot.$(nBC, eBC.n1, eCD.n1, eBC.n2, eCD.n2);
+  const capC = endCapSlot.$(eBC.n2, nBC, eBC.n1);
+  const joinC = joinSlot.$(nBC, eBC.n1, eCD.n1, eBC.n2, eCD.n2);
   if (isCapC) {
-    joinC = capC;
+    joinC.dL = capC.right;
+    joinC.d = capC.rightForward;
+    joinC.c = capC.forward;
+    joinC.u = capC.leftForward;
+    joinC.uL = capC.left;
+    joinC.joinDL = capC.joinRight;
+    joinC.joinUL = capC.joinLeft;
   }
 
   let v5 = addMul(C.position, joinC.dL, C.radius);
@@ -121,6 +133,7 @@ export const lineSegmentVariableWidth = tgpu.fn([
   v5 = lim38.b;
 
   // if not a join, these need to be merged after limits are applied
+  // in order for joins not to go into infinity
   if (!joinB.joinUR) {
     v1 = v0;
   }

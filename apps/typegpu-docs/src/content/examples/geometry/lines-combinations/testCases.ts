@@ -23,12 +23,12 @@ const testCaseShell = tgpu.fn([u32, f32], LineSegmentVertex);
 
 const segmentSide = tgpu['~unstable'].const(arrayOf(f32, 4), [-1, -1, 1, 1]);
 
-export const segmentAlternate = testCaseShell(
+export const aasegmentAlternate = testCaseShell(
   (vertexIndex, t) => {
     'kernel';
     const side = segmentSide.$[vertexIndex];
     const r = sin(t + select(0, Math.PI / 2, side === -1));
-    const radius = 0.25 * r * r;
+    const radius = 0.4 * r * r;
     return LineSegmentVertex({
       position: vec2f(0.5 * side * cos(t), 0.5 * side * sin(t)),
       radius,

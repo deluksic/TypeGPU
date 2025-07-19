@@ -22,6 +22,12 @@ import {
   rot90cw,
 } from '../utils.ts';
 
+/** Intersects tangent to point on a circle `a` with line from center in direction `n`. */
+export const intersectTangent = tgpu.fn([vec2f, vec2f], vec2f)((a, n) => {
+  const cos_ = dot(a, n);
+  return mul(n, 1 / cos_);
+});
+
 /**
  * Finds the miter point of tangents to two points on a circle.
  * The miter point is on the smaller arc.

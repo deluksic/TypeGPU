@@ -23,3 +23,14 @@ export const JoinResult = struct({
   joinUR: bool,
   joinDR: bool,
 });
+
+export type CapResult = Infer<typeof CapResult>;
+export const CapResult = struct({
+  left: vec2f,
+  leftForward: vec2f,
+  forward: vec2f,
+  rightForward: vec2f,
+  right: vec2f,
+  joinLeft: bool,
+  joinRight: bool,
+});
