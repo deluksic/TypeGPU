@@ -10,7 +10,12 @@ import {
   rot90ccw,
   rot90cw,
 } from '../utils.ts';
-import { externalNormals, limitTowardsMiddle } from './utils.ts';
+import {
+  externalNormals,
+  limitTowardsMiddle,
+  miterPoint,
+  miterPointNoCheck,
+} from './utils.ts';
 import { roundJoin } from './joins/round.ts';
 import { roundCap } from './caps/round.ts';
 import { JoinPath } from './types.ts';
@@ -167,14 +172,6 @@ export const lineSegmentVariableWidth = tgpu.fn([
     u32(joinC.joinU),
   ];
 
-  // deno-fmt-ignore
-  const parents = [
-    joinB.uR, joinB.u,
-    joinB.d, joinB.dR,
-    joinC.dL, joinC.d,
-    joinC.u, joinC.uL,
-  ];
-
   const noJoinPoints = [v0, v4, v5, v9];
 
   const joinIndex = joinPath.joinIndex;
@@ -185,23 +182,29 @@ export const lineSegmentVariableWidth = tgpu.fn([
     };
   }
 
+  // deno-fmt-ignore
+  const parents = [
+    joinB.uR, joinB.u,
+    joinB.d, joinB.dR,
+    joinC.dL, joinC.d,
+    joinC.u, joinC.uL,
+  ];
+
   let lineVertex = B;
   if (joinPath.joinIndex >= 2) {
     lineVertex = C;
   }
   let d0 = parents[joinIndex * 2] as v2f;
   let d1 = parents[joinIndex * 2 + 1] as v2f;
-  let d = bisectCcw(d0, d1);
-  let depth = joinPath.depth;
-  let path = joinPath.path;
-  while (depth > 0) {
-    const isLeftChild = (path & 1) === 0;
-    path = path >> 1;
-    depth -= 1;
-    d0 = select(d, d0, isLeftChild);
-    d1 = select(d1, d, isLeftChild);
-    d = bisectNoCheck(d0, d1);
-  }
+  let d = miterPoint(d0, d1);
+  // while (depth > 0) {
+  //   const isLeftChild = (path & 1) === 0;
+  //   path = path >> 1;
+  //   depth -= 1;
+  //   d0 = select(d, d0, isLeftChild);
+  //   d1 = select(d1, d, isLeftChild);
+  //   d = bisectNoCheck(d0, d1);
+  // }
   return {
     situationIndex: joinB.situationIndex,
     vertexPosition: addMul(lineVertex.position, d, lineVertex.radius),

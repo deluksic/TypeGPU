@@ -55,7 +55,7 @@ export const miterPoint = tgpu.fn([vec2f, vec2f], vec2f)((a, b) => {
   const diff = b2 - cos_;
   if (diff * diff < 1e-4) {
     // the vectors are almost colinear
-    return bisection;
+    return midPoint(a, b);
   }
   const t = diff / sin_;
   return addMul(a, rot90ccw(a), t);
@@ -65,6 +65,7 @@ const MiterLimitResult = struct({
   left: vec2f,
   mid: vec2f,
   right: vec2f,
+  shouldJoin: bool,
 });
 
 export const miterLimit = tgpu.fn([vec2f, vec2f], MiterLimitResult)(
@@ -78,27 +79,31 @@ export const miterLimit = tgpu.fn([vec2f, vec2f], MiterLimitResult)(
         left: same,
         mid: same,
         right: same,
+        shouldJoin: false,
       };
     }
     const b2 = dot(b, b);
     const cos_ = dot(a, b);
     const diff = b2 - cos_;
-    if (diff * diff < 1e-4) {
+    if (sin_ < 1e-4) {
       // the vectors are almost colinear
       const same = bisection;
       return {
         left: same,
         mid: same,
         right: same,
+        shouldJoin: false,
       };
     }
-    const t = clamp(diff / sin_, 0, 1);
+    const tOriginal = diff / sin_;
+    const t = clamp(tOriginal, 0, 1);
     const left = addMul(a, rot90ccw(a), t);
     const right = addMul(b, rot90cw(b), t);
     return {
       left: left,
       mid: midPoint(left, right),
       right: right,
+      shouldJoin: true,
     };
   },
 );

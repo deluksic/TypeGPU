@@ -40,7 +40,9 @@ if (!context) {
   throw new Error('Could not create WebGPU context');
 }
 
-const adapter = await navigator.gpu.requestAdapter();
+const adapter = await navigator.gpu.requestAdapter({
+  powerPreference: 'high-performance',
+});
 const device = await adapter?.requestDevice({
   requiredFeatures: ['timestamp-query'],
 });
@@ -174,8 +176,11 @@ const mainFragment = tgpu['~unstable'].fragmentFn({
       vec3f(1, 0, 1), // 3
       vec3f(1, 1, 0), // 4
       vec3f(0, 1, 1), // 5
+      vec3f(0.75, 0.25, 0.25), // 6
+      vec3f(0.25, 0.75, 0.25), // 7
+      vec3f(0.25, 0.25, 0.75), // 8
     ];
-    const color = colors[index % 6];
+    const color = colors[index % colors.length];
     if (frontFacing) {
       return vec4f(color, 0.5);
     }

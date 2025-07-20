@@ -1,40 +1,23 @@
 import tgpu from 'typegpu';
 import { vec2f } from 'typegpu/data';
 import { add, dot, mul, normalize, select } from 'typegpu/std';
-import { bisectCcw, cross2d } from '../../utils.ts';
+import { bisectCcw } from '../../utils.ts';
 import { JoinResult } from '../types.ts';
 import {
   intersectLines,
-  isCCW,
   miterLimit,
   miterPoint,
   miterPointNoCheck,
-  rank3,
 } from '../utils.ts';
 import { JOIN_LIMIT } from '../constants.ts';
+import { joinSituationIndex } from './common.ts';
 
 export const miterJoin = tgpu.fn(
   [vec2f, vec2f, vec2f, vec2f],
   JoinResult,
 )(
   (ul, ur, dl, dr) => {
-    // ur is the reference vector
-    // we find all 6 orderings of the remaining ul, dl, dr
-    const crossUL = cross2d(ur, ul);
-    const crossDL = cross2d(ur, dl);
-    const crossDR = cross2d(ur, dr);
-    const signUL = crossUL >= 0;
-    const signDL = crossDL >= 0;
-    const signDR = crossDR >= 0;
-    const dotUL = dot(ur, ul);
-    const dotDL = dot(ur, dl);
-    const dotDR = dot(ur, dr);
-
-    const situationIndex = rank3(
-      isCCW(dotUL, signUL, dotDL, signDL),
-      isCCW(dotDL, signDL, dotDR, signDR),
-      isCCW(dotUL, signUL, dotDR, signDR),
-    );
+    const situationIndex = joinSituationIndex(ul, ur, dl, dr);
 
     const midR = bisectCcw(ur, dr);
     const midL = bisectCcw(dl, ul);
@@ -73,8 +56,8 @@ export const miterJoin = tgpu.fn(
         dL: dl,
         d: miterD.mid,
         dR: dr,
-        joinU: true,
-        joinD: true,
+        joinU: miterU.shouldJoin,
+        joinD: miterD.shouldJoin,
         situationIndex,
       });
     }
@@ -88,7 +71,7 @@ export const miterJoin = tgpu.fn(
         dL: reverseMiterD,
         d: reverseMiterD,
         dR: reverseMiterD,
-        joinU: true,
+        joinU: miterU.shouldJoin,
         joinD: false,
         situationIndex,
       });
@@ -134,7 +117,7 @@ export const miterJoin = tgpu.fn(
         d: miterD.mid,
         dR: dr,
         joinU: false,
-        joinD: true,
+        joinD: miterD.shouldJoin,
         situationIndex,
       });
     }

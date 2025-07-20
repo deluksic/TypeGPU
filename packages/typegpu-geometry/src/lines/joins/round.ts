@@ -1,39 +1,18 @@
 import tgpu from 'typegpu';
 import { vec2f } from 'typegpu/data';
 import { add, dot, mul, select } from 'typegpu/std';
-import { bisectCcw, cross2d } from '../../utils.ts';
+import { bisectCcw } from '../../utils.ts';
 import { JoinResult } from '../types.ts';
-import {
-  intersectLines,
-  isCCW,
-  miterPoint,
-  miterPointNoCheck,
-  rank3,
-} from '../utils.ts';
+import { intersectLines, miterPoint, miterPointNoCheck } from '../utils.ts';
 import { JOIN_LIMIT } from '../constants.ts';
+import { joinSituationIndex } from './common.ts';
 
 export const roundJoin = tgpu.fn(
   [vec2f, vec2f, vec2f, vec2f],
   JoinResult,
 )(
   (ul, ur, dl, dr) => {
-    // ur is the reference vector
-    // we find all 6 orderings of the remaining ul, dl, dr
-    const crossUL = cross2d(ur, ul);
-    const crossDL = cross2d(ur, dl);
-    const crossDR = cross2d(ur, dr);
-    const signUL = crossUL >= 0;
-    const signDL = crossDL >= 0;
-    const signDR = crossDR >= 0;
-    const dotUL = dot(ur, ul);
-    const dotDL = dot(ur, dl);
-    const dotDR = dot(ur, dr);
-
-    const situationIndex = rank3(
-      isCCW(dotUL, signUL, dotDL, signDL),
-      isCCW(dotDL, signDL, dotDR, signDR),
-      isCCW(dotUL, signUL, dotDR, signDR),
-    );
+    const situationIndex = joinSituationIndex(ul, ur, dl, dr);
 
     const midU = bisectCcw(ur, ul);
     const midD = bisectCcw(dl, dr);
