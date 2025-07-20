@@ -1,5 +1,5 @@
 import tgpu from 'typegpu';
-import { bool, f32, struct, vec2f } from 'typegpu/data';
+import { arrayOf, bool, f32, struct, u32, vec2f } from 'typegpu/data';
 import {
   add,
   clamp,
@@ -10,6 +10,7 @@ import {
   mix,
   mul,
   normalize,
+  select,
   sqrt,
   sub,
 } from 'typegpu/std';
@@ -182,5 +183,28 @@ export const distanceToLineSegment = tgpu.fn([vec2f, vec2f, vec2f], f32)(
     const t = clamp(dot(p, AB) / dot(AB, AB), 0, 1);
     const projP = addMul(A, AB, t);
     return distance(point, projP);
+  },
+);
+
+const lookup = tgpu['~unstable'].const(arrayOf(u32, 8), [
+  5, // 000 c >= b >= a
+  3, // 001 INVALID
+  4, // 010 b > c >= a
+  3, // 011 b >= a > c
+  2, // 100 c >= a > b
+  1, // 101 a > c >= b
+  0, // 110 INVALID
+  0, // 111 a > b > c
+]);
+
+export const rank3 = tgpu.fn([bool, bool, bool], u32)((aGb, bGc, aGc) => {
+  const code = (u32(aGb) << 2) | (u32(bGc) << 1) | u32(aGc);
+  return lookup.$[code] as number;
+});
+
+export const isCCW = tgpu.fn([f32, bool, f32, bool], bool)(
+  (aX, aYSign, bX, bYSign) => {
+    const sameSide = aYSign === bYSign;
+    return select(aYSign, aYSign === (aX >= bX), sameSide);
   },
 );

@@ -23,7 +23,7 @@ const testCaseShell = tgpu.fn([u32, f32], LineSegmentVertex);
 
 const segmentSide = tgpu['~unstable'].const(arrayOf(f32, 4), [-1, -1, 1, 1]);
 
-export const aasegmentAlternate = testCaseShell(
+export const segmentAlternate = testCaseShell(
   (vertexIndex, t) => {
     'kernel';
     const side = segmentSide.$[vertexIndex];
@@ -109,7 +109,7 @@ export const bending = testCaseShell(
   },
 );
 
-export const animateWidth = testCaseShell(
+export const aanimateWidth = testCaseShell(
   (vertexIndex, t) => {
     'kernel';
     const i = (f32(vertexIndex) % TEST_SEGMENT_COUNT) / TEST_SEGMENT_COUNT;

@@ -1,131 +1,156 @@
 import tgpu from 'typegpu';
-import { f32, vec2f } from 'typegpu/data';
-import { add, dot, normalize, select, sub } from 'typegpu/std';
-import { bisectCcw, cross2d, midPoint } from '../../utils.ts';
+import { vec2f } from 'typegpu/data';
+import { add, dot, mul, normalize, select } from 'typegpu/std';
+import { bisectCcw, cross2d } from '../../utils.ts';
 import { JoinResult } from '../types.ts';
-import { miterLimit, miterPoint } from '../utils.ts';
+import {
+  intersectLines,
+  isCCW,
+  miterLimit,
+  miterPoint,
+  miterPointNoCheck,
+  rank3,
+} from '../utils.ts';
+import { JOIN_LIMIT } from '../constants.ts';
 
 export const miterJoin = tgpu.fn(
-  [vec2f, vec2f, vec2f, vec2f, vec2f],
+  [vec2f, vec2f, vec2f, vec2f],
   JoinResult,
 )(
-  (nL, nUL, nUR, nDL, nDR) => {
-    const xL = dot(nL, nUL); // == dot(nL, nDL)
-    const xUR = dot(nL, nUR);
-    const xDR = dot(nL, nDR);
-    const yUR = cross2d(nL, nUR);
-    const yDR = cross2d(nL, nDR);
-    const sideUR = select(f32(-1), f32(1), xUR - xL >= 0);
-    const sideDR = select(f32(-1), f32(1), xDR - xL >= 0);
+  (ul, ur, dl, dr) => {
+    // ur is the reference vector
+    // we find all 6 orderings of the remaining ul, dl, dr
+    const crossUL = cross2d(ur, ul);
+    const crossDL = cross2d(ur, dl);
+    const crossDR = cross2d(ur, dr);
+    const signUL = crossUL >= 0;
+    const signDL = crossDL >= 0;
+    const signDR = crossDR >= 0;
+    const dotUL = dot(ur, ul);
+    const dotDL = dot(ur, dl);
+    const dotDR = dot(ur, dr);
 
-    const midR = bisectCcw(nUR, nDR);
-    const midL = bisectCcw(nDL, nUL);
-    const reverseMiterU = miterPoint(nUL, nUR);
-    const reverseMiterD = miterPoint(nDR, nDL);
+    const situationIndex = rank3(
+      isCCW(dotUL, signUL, dotDL, signDL),
+      isCCW(dotDL, signDL, dotDR, signDR),
+      isCCW(dotUL, signUL, dotDR, signDR),
+    );
 
-    const miterU = miterLimit(nUR, nUL);
-    const miterD = miterLimit(nDL, nDR);
+    const midR = bisectCcw(ur, dr);
+    const midL = bisectCcw(dl, ul);
 
-    if (sideUR === sideDR) {
-      const side = sideUR;
-      const XUR = select(xUR, side * 2 - xUR, yUR < 0);
-      const XDR = select(xDR, side * 2 - xDR, yDR < 0);
-      const clockWise = (side * (XUR - XDR)) <= 0;
-      if (side === 1) {
-        if (clockWise) {
-          return JoinResult({
-            uL: miterU.left,
-            u: miterU.mid,
-            uR: miterU.right,
-            c: midPoint(miterU.mid, miterD.mid),
-            dL: miterD.left,
-            d: miterD.mid,
-            dR: miterD.right,
-            joinUL: false,
-            joinUR: false,
-            joinDL: false,
-            joinDR: false,
-            situationIndex: 0,
-          });
-        }
-        return JoinResult({
-          uL: nUL,
-          u: midR,
-          uR: nUR,
-          c: midR,
-          dL: nDL,
-          d: midR,
-          dR: nDR,
-          joinUL: false,
-          joinUR: false,
-          joinDL: false,
-          joinDR: false,
-          situationIndex: 1,
-        });
-      }
-      // side == -1
-      if (clockWise) {
-        return JoinResult({
-          uL: reverseMiterU,
-          u: reverseMiterU,
-          uR: reverseMiterU,
-          c: midPoint(reverseMiterU, reverseMiterD),
-          dL: reverseMiterD,
-          d: reverseMiterD,
-          dR: reverseMiterD,
-          joinUL: false,
-          joinUR: false,
-          joinDL: false,
-          joinDR: false,
-          situationIndex: 2,
-        });
-      }
+    const miterU = miterLimit(ur, ul);
+    const miterD = miterLimit(dl, dr);
+
+    const joinU = dot(ul, ur) < JOIN_LIMIT.$;
+    const joinD = dot(dl, dr) < JOIN_LIMIT.$;
+    const reverseMiterU = select(
+      miterPointNoCheck(ul, ur),
+      miterPoint(ul, ur),
+      joinU,
+    );
+    const reverseMiterD = select(
+      miterPointNoCheck(dr, dl),
+      miterPoint(dr, dl),
+      joinD,
+    );
+
+    const crossCenter = intersectLines(ul, dl, ur, dr).point;
+    const averageCenter = mul(
+      add(
+        normalize(miterU.mid),
+        normalize(miterD.mid),
+      ),
+      0.5,
+    );
+
+    if (situationIndex === 0) {
       return JoinResult({
-        uL: nUL,
-        u: midL,
-        uR: nUR,
-        c: midL,
-        dL: nDL,
-        d: midL,
-        dR: nDR,
-        joinUL: false,
-        joinUR: false,
-        joinDL: false,
-        joinDR: false,
-        situationIndex: 3,
+        uL: ul,
+        u: miterU.mid,
+        uR: ur,
+        c: averageCenter,
+        dL: dl,
+        d: miterD.mid,
+        dR: dr,
+        joinU: true,
+        joinD: true,
+        situationIndex,
       });
     }
 
-    if (sideUR === 1) {
+    if (situationIndex === 1) {
       return JoinResult({
-        uL: miterU.right,
+        uL: ul,
         u: miterU.mid,
-        uR: miterU.left,
-        c: add(miterU.mid, normalize(sub(reverseMiterD, miterU.mid))),
+        uR: ur,
+        c: crossCenter,
         dL: reverseMiterD,
         d: reverseMiterD,
         dR: reverseMiterD,
-        joinUL: true,
-        joinUR: true,
-        joinDL: false,
-        joinDR: false,
-        situationIndex: 4,
+        joinU: true,
+        joinD: false,
+        situationIndex,
       });
     }
 
+    if (situationIndex === 2) {
+      return JoinResult({
+        uL: ul,
+        u: midR,
+        uR: ur,
+        c: midR,
+        dL: dl,
+        d: midR,
+        dR: dr,
+        joinU: true,
+        joinD: true,
+        situationIndex,
+      });
+    }
+
+    if (situationIndex === 3) {
+      return JoinResult({
+        uL: ul,
+        u: midL,
+        uR: ur,
+        c: midL,
+        dL: dl,
+        d: midL,
+        dR: dr,
+        joinU: true,
+        joinD: true,
+        situationIndex,
+      });
+    }
+
+    if (situationIndex === 4) {
+      return JoinResult({
+        uL: reverseMiterU,
+        u: reverseMiterU,
+        uR: reverseMiterU,
+        c: crossCenter,
+        dL: dl,
+        d: miterD.mid,
+        dR: dr,
+        joinU: false,
+        joinD: true,
+        situationIndex,
+      });
+    }
+
+    // situationIndex === 5
     return JoinResult({
       uL: reverseMiterU,
       u: reverseMiterU,
       uR: reverseMiterU,
-      c: add(miterD.mid, normalize(sub(reverseMiterU, miterD.mid))),
-      dL: miterD.left,
-      d: miterD.mid,
-      dR: miterD.right,
-      joinUL: false,
-      joinUR: false,
-      joinDL: true,
-      joinDR: true,
-      situationIndex: 5,
+      c: averageCenter,
+      dL: reverseMiterD,
+      d: reverseMiterD,
+      dR: reverseMiterD,
+      joinU: false,
+      joinD: false,
+      situationIndex,
     });
   },
 );

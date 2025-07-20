@@ -6,8 +6,10 @@ import {
   joinSlot,
   lineCaps,
   lineJoins,
+  lineSegmentIndicesCapLevel0,
   lineSegmentIndicesCapLevel3,
   lineSegmentVariableWidth,
+  lineSegmentWireframeIndicesCapLevel0,
   lineSegmentWireframeIndicesCapLevel3,
   startCapSlot,
 } from '@typegpu/geometry';
@@ -396,11 +398,11 @@ const runAnimationFrame = (timeMs: number) => {
 runAnimationFrame(0);
 
 const fillOptions = {
-  None: 0,
-  Solid: 1,
-  Instance: 2,
-  Triangle: 3,
-  Situation: 4,
+  none: 0,
+  solid: 1,
+  instance: 2,
+  triangle: 3,
+  situation: 4,
 };
 
 export const controls = {
@@ -413,7 +415,7 @@ export const controls = {
     },
   },
   'Start Cap': {
-    initial: 'butt',
+    initial: 'round',
     options: Object.keys(lineCaps),
     onSelectChange: async (selected: keyof typeof lineCaps) => {
       startCap = lineCaps[selected];
@@ -421,7 +423,7 @@ export const controls = {
     },
   },
   'End Cap': {
-    initial: 'butt',
+    initial: 'round',
     options: Object.keys(lineCaps),
     onSelectChange: async (selected: keyof typeof lineCaps) => {
       endCap = lineCaps[selected];
@@ -437,7 +439,7 @@ export const controls = {
     },
   },
   'Fill': {
-    initial: 'Solid',
+    initial: 'solid',
     options: Object.keys(fillOptions),
     onSelectChange: async (selected: keyof typeof fillOptions) => {
       fillType = fillOptions[selected];

@@ -18,10 +18,8 @@ export const JoinResult = struct({
   d: vec2f,
   dR: vec2f,
   situationIndex: u32,
-  joinUL: bool,
-  joinDL: bool,
-  joinUR: bool,
-  joinDR: bool,
+  joinU: bool,
+  joinD: bool,
 });
 
 export type CapResult = Infer<typeof CapResult>;

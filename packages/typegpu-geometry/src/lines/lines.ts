@@ -21,20 +21,16 @@ export const endCapSlot = tgpu.slot(roundCap);
 
 const getJoinParent = tgpu.fn([u32], u32)((i) => (i - 4) >> 1);
 
-const getJoinPath = tgpu.fn([u32], JoinPath)((vertexIndex) => {
-  let i = vertexIndex - 10;
+const getJoinVertexPath = tgpu.fn([u32], JoinPath)((vertexIndex) => {
+  let joinIndex = vertexIndex - 10;
   let depth = u32(0);
   let path = u32(0);
-  while (i >= 4) {
-    path = (path << 1) | (i & 1);
-    i = getJoinParent(i);
+  while (joinIndex >= 4) {
+    path = (path << 1) | (joinIndex & 1);
+    joinIndex = getJoinParent(joinIndex);
     depth += 1;
   }
-  return JoinPath({
-    joinIndex: i,
-    path,
-    depth,
-  });
+  return JoinPath({ joinIndex, path, depth });
 });
 
 const LineSegmentOutput = struct({
@@ -55,7 +51,7 @@ export const lineSegmentVariableWidth = tgpu.fn([
   LineSegmentVertex,
   LineSegmentVertex,
 ], LineSegmentOutput)((vertexIndex, A, B, C, D) => {
-  const joinPath = getJoinPath(vertexIndex);
+  const joinPath = getJoinVertexPath(vertexIndex);
 
   const AB = sub(B.position, A.position);
   const BC = sub(C.position, B.position);
@@ -86,15 +82,15 @@ export const lineSegmentVariableWidth = tgpu.fn([
   const nBC = normalize(BC);
 
   const capB = startCapSlot.$(eBC.n1, mul(nBC, -1), eBC.n2);
-  const joinB = joinSlot.$(nAB, eAB.n1, eBC.n1, eAB.n2, eBC.n2);
+  const joinB = joinSlot.$(eAB.n1, eBC.n1, eAB.n2, eBC.n2);
   if (isCapB) {
     joinB.uR = capB.right;
     joinB.u = capB.rightForward;
     joinB.c = capB.forward;
     joinB.d = capB.leftForward;
     joinB.dR = capB.left;
-    joinB.joinUR = capB.joinRight;
-    joinB.joinDR = capB.joinLeft;
+    joinB.joinU = capB.joinRight;
+    joinB.joinD = capB.joinLeft;
   }
 
   let v0 = addMul(B.position, joinB.uR, B.radius);
@@ -104,15 +100,15 @@ export const lineSegmentVariableWidth = tgpu.fn([
   let v4 = addMul(B.position, joinB.dR, B.radius);
 
   const capC = endCapSlot.$(eBC.n2, nBC, eBC.n1);
-  const joinC = joinSlot.$(nBC, eBC.n1, eCD.n1, eBC.n2, eCD.n2);
+  const joinC = joinSlot.$(eBC.n1, eCD.n1, eBC.n2, eCD.n2);
   if (isCapC) {
     joinC.dL = capC.right;
     joinC.d = capC.rightForward;
     joinC.c = capC.forward;
     joinC.u = capC.leftForward;
     joinC.uL = capC.left;
-    joinC.joinDL = capC.joinRight;
-    joinC.joinUL = capC.joinLeft;
+    joinC.joinD = capC.joinRight;
+    joinC.joinU = capC.joinLeft;
   }
 
   let v5 = addMul(C.position, joinC.dL, C.radius);
@@ -134,24 +130,24 @@ export const lineSegmentVariableWidth = tgpu.fn([
 
   // if not a join, these need to be merged after limits are applied
   // in order for joins not to go into infinity
-  if (!joinB.joinUR) {
+  if (!joinB.joinU) {
     v1 = v0;
   }
-  if (!joinB.joinDR) {
+  if (!joinB.joinD) {
     v3 = v4;
   }
-  if (!joinC.joinUL) {
-    v8 = v9;
-  }
-  if (!joinC.joinDL) {
+  if (!joinC.joinD) {
     v6 = v5;
   }
-  if (joinB.situationIndex === 2) {
-    // remove central triangle but only after limits are applied
+  if (!joinC.joinU) {
+    v8 = v9;
+  }
+
+  // remove central triangle but only after limits are applied
+  if (!isCapB && joinB.situationIndex === 5) {
     v2 = v0;
   }
-  if (joinC.situationIndex === 2) {
-    // remove central triangle but only after limits are applied
+  if (!isCapC && joinC.situationIndex === 5) {
     v7 = v9;
   }
 
@@ -165,10 +161,10 @@ export const lineSegmentVariableWidth = tgpu.fn([
   }
 
   const shouldJoin = [
-    u32(joinB.joinUR),
-    u32(joinB.joinDR),
-    u32(joinC.joinDL),
-    u32(joinC.joinUL),
+    u32(joinB.joinU),
+    u32(joinB.joinD),
+    u32(joinC.joinD),
+    u32(joinC.joinU),
   ];
 
   // deno-fmt-ignore
