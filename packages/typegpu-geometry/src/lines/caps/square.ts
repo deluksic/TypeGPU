@@ -31,8 +31,6 @@ export const squareCap = tgpu.fn(
       forward: dir,
       leftForward,
       left: miterL,
-      joinRight: true,
-      joinLeft: true,
     });
   },
 );

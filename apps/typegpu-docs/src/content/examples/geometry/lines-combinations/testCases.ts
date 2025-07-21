@@ -109,7 +109,7 @@ export const bending = testCaseShell(
   },
 );
 
-export const aanimateWidth = testCaseShell(
+export const animateWidth = testCaseShell(
   (vertexIndex, t) => {
     'kernel';
     const i = (f32(vertexIndex) % TEST_SEGMENT_COUNT) / TEST_SEGMENT_COUNT;
@@ -166,7 +166,7 @@ export const arms = testCaseShell(
   },
 );
 
-export const armsSmall = testCaseShell(
+export const aarmsSmall = testCaseShell(
   (vertexIndex, t) => {
     'kernel';
     const result = arms(vertexIndex, t);

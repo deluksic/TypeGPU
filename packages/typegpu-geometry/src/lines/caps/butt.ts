@@ -3,7 +3,7 @@ import { vec2f } from 'typegpu/data';
 import { rot90ccw, rot90cw } from '../../utils.ts';
 import { CapResult } from '../types.ts';
 import { dot, select } from 'typegpu/std';
-import { intersectTangent, miterPointNoCheck } from '../utils.ts';
+import { intersectTangent } from '../utils.ts';
 
 export const buttCap = tgpu.fn(
   [vec2f, vec2f, vec2f],
@@ -13,8 +13,6 @@ export const buttCap = tgpu.fn(
     const shouldJoin = dot(dir, right) < 0;
     const dirRight = rot90cw(dir);
     const dirLeft = rot90ccw(dir);
-    const miterR = miterPointNoCheck(right, dirRight);
-    const miterL = miterPointNoCheck(dirLeft, left);
     const rightForward = select(
       intersectTangent(right, dirRight),
       dirRight,
@@ -31,8 +29,6 @@ export const buttCap = tgpu.fn(
       forward: vec2f(0, 0),
       leftForward,
       left: select(leftForward, left, shouldJoin),
-      joinRight: true,
-      joinLeft: true,
     });
   },
 );

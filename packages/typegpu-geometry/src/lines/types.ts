@@ -1,4 +1,4 @@
-import { bool, struct, u32, vec2f } from 'typegpu/data';
+import { struct, u32, vec2f } from 'typegpu/data';
 import type { Infer } from 'typegpu/data';
 
 export type JoinPath = Infer<typeof JoinPath>;
@@ -18,8 +18,6 @@ export const JoinResult = struct({
   d: vec2f,
   dR: vec2f,
   situationIndex: u32,
-  joinU: bool,
-  joinD: bool,
 });
 
 export type CapResult = Infer<typeof CapResult>;
@@ -29,6 +27,4 @@ export const CapResult = struct({
   forward: vec2f,
   rightForward: vec2f,
   right: vec2f,
-  joinLeft: bool,
-  joinRight: bool,
 });

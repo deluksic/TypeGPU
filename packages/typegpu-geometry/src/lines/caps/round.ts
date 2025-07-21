@@ -13,8 +13,6 @@ export const roundCap = tgpu.fn(
       forward: dir,
       leftForward: dir,
       left,
-      joinRight: true,
-      joinLeft: true,
     });
   },
 );
