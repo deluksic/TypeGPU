@@ -161,6 +161,7 @@ export const intersectLines = tgpu.fn(
 const LimitAlongResult = struct({
   a: vec2f,
   b: vec2f,
+  limitWasHit: bool,
 });
 
 /**
@@ -173,12 +174,12 @@ export const limitTowardsMiddle = tgpu.fn(
   (middle, dir, p1, p2) => {
     const t1 = dot(sub(p1, middle), dir);
     const t2 = dot(sub(p2, middle), dir);
-    if (t1 < t2) {
-      return LimitAlongResult({ a: p1, b: p2 });
+    if (t1 <= t2) {
+      return LimitAlongResult({ a: p1, b: p2, limitWasHit: false });
     }
-    const t = clamp((0 - t1) / (t2 - t1), 0, 1);
+    const t = clamp(t1 / (t1 - t2), 0, 1);
     const p = mix(p1, p2, t);
-    return LimitAlongResult({ a: p, b: p });
+    return LimitAlongResult({ a: p, b: p, limitWasHit: true });
   },
 );
 

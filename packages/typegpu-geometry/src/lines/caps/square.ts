@@ -1,36 +1,67 @@
 import tgpu from 'typegpu';
-import { vec2f } from 'typegpu/data';
-import { CapResult } from '../types.ts';
-import { miterPointNoCheck } from '../utils.ts';
+import { u32, vec2f } from 'typegpu/data';
+import type { v2f } from 'typegpu/data';
 import { add, dot, select } from 'typegpu/std';
-import { rot90ccw, rot90cw } from '../../utils.ts';
+import { addMul, rot90ccw, rot90cw } from '../../utils.ts';
+import { JoinPath, LineSegmentVertex } from '../types.ts';
+import { miterPointNoCheck } from '../utils.ts';
 
-export const squareCap = tgpu.fn(
-  [vec2f, vec2f, vec2f],
-  CapResult,
-)(
-  (right, dir, left) => {
+export const squareCap = tgpu.fn([
+  u32,
+  JoinPath,
+  LineSegmentVertex,
+  vec2f,
+  vec2f,
+  vec2f,
+  vec2f,
+  vec2f,
+], vec2f)(
+  (
+    vertexIndex,
+    joinPath,
+    V,
+    vu,
+    vd,
+    right,
+    dir,
+    left,
+  ) => {
     const shouldJoin = dot(dir, right) < 0;
     const dirRight = rot90cw(dir);
     const dirLeft = rot90ccw(dir);
-    const miterR = miterPointNoCheck(right, dirRight);
-    const miterL = miterPointNoCheck(dirLeft, left);
-    const rightForward = select(
+    const u = select(
       miterPointNoCheck(right, dir),
       add(dir, dirRight),
       shouldJoin,
     );
-    const leftForward = select(
+    const c = dir;
+    const d = select(
       miterPointNoCheck(dir, left),
       add(dir, dirLeft),
       shouldJoin,
     );
-    return CapResult({
-      right: miterR,
-      rightForward,
-      forward: dir,
-      leftForward,
-      left: miterL,
-    });
+
+    const joinIndex = joinPath.joinIndex;
+    if (joinPath.depth >= 0) {
+      const miterR = select(
+        right,
+        miterPointNoCheck(right, dirRight),
+        shouldJoin,
+      );
+      const miterL = select(
+        left,
+        miterPointNoCheck(dirLeft, left),
+        shouldJoin,
+      );
+      const parents = [miterR, miterL];
+      const dm = parents[joinIndex & 0b1] as v2f;
+      return addMul(V.position, dm, V.radius);
+    }
+
+    const v1 = addMul(V.position, u, V.radius);
+    const v2 = addMul(V.position, c, V.radius);
+    const v3 = addMul(V.position, d, V.radius);
+    const points = [vu, v1, v2, v3, vd];
+    return points[vertexIndex % 5] as v2f;
   },
 );

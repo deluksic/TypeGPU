@@ -420,7 +420,7 @@ export const controls = {
     },
   },
   'Start Cap': {
-    initial: 'round',
+    initial: 'butt',
     options: Object.keys(lineCaps),
     onSelectChange: async (selected: keyof typeof lineCaps) => {
       startCap = lineCaps[selected];
@@ -428,7 +428,7 @@ export const controls = {
     },
   },
   'End Cap': {
-    initial: 'round',
+    initial: 'butt',
     options: Object.keys(lineCaps),
     onSelectChange: async (selected: keyof typeof lineCaps) => {
       endCap = lineCaps[selected];
@@ -436,7 +436,7 @@ export const controls = {
     },
   },
   'Join': {
-    initial: 'round',
+    initial: 'miter',
     options: Object.keys(lineJoins),
     onSelectChange: async (selected: keyof typeof lineJoins) => {
       join = lineJoins[selected];
@@ -458,7 +458,7 @@ export const controls = {
     },
   },
   'Radius and centerline': {
-    initial: true,
+    initial: false,
     onToggleChange: (value: boolean) => {
       showRadii = value;
     },

@@ -212,7 +212,7 @@ export const flyingSquares = testCaseShell(
   (vertexIndex, t) => {
     'kernel';
     const squareIndex = vertexIndex / 8;
-    randSeed(f32(squareIndex));
+    randSeed(f32(squareIndex + 5));
     const squarePoints = [
       vec2f(-1, -1),
       vec2f(1, -1),
