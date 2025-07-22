@@ -2,17 +2,7 @@ import { LineSegmentVertex } from '@typegpu/geometry';
 import { perlin2d } from '@typegpu/noise';
 import tgpu from 'typegpu';
 import { arrayOf, f32, i32, mat2x2f, u32, vec2f } from 'typegpu/data';
-import {
-  add,
-  clamp,
-  cos,
-  floor,
-  max,
-  mul,
-  pow,
-  select,
-  sin,
-} from 'typegpu/std';
+import { add, clamp, cos, floor, mul, pow, select, sin } from 'typegpu/std';
 import { TEST_SEGMENT_COUNT } from './constants.ts';
 import {
   randFloat01,
@@ -126,9 +116,9 @@ export const perlinTraces = testCaseShell(
   (vertexIndex, t) => {
     'kernel';
     const perLine = u32(200);
-    const i = f32(max(vertexIndex, 0)) / f32(perLine);
-    const n = floor(i);
-    const x = 2 * (i - n) - 1;
+    const n = floor(f32(vertexIndex) / f32(perLine));
+    const x =
+      2 * f32(clamp(vertexIndex % perLine, 2, perLine - 2)) / f32(perLine) - 1;
     const value = 0.5 * perlin2d.sample(vec2f(2 * x + 2 * t, t + 0.1 * n)) +
       0.25 * perlin2d.sample(vec2f(4 * x, t + 100 + 0.1 * n)) +
       0.125 * perlin2d.sample(vec2f(8 * x, t + 200 + 0.2 * n)) +

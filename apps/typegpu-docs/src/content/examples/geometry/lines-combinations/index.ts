@@ -7,9 +7,11 @@ import {
   lineCaps,
   lineJoins,
   lineSegmentIndicesCapLevel0,
+  lineSegmentIndicesCapLevel1,
   lineSegmentIndicesCapLevel3,
   lineSegmentVariableWidth,
   lineSegmentWireframeIndicesCapLevel0,
+  lineSegmentWireframeIndicesCapLevel1,
   lineSegmentWireframeIndicesCapLevel3,
   startCapSlot,
 } from '@typegpu/geometry';
@@ -364,7 +366,7 @@ const draw = (timeMs: number) => {
       }
     })
     .drawIndexed(
-      lineSegmentIndicesCapLevel3.length,
+      lineSegmentIndicesCapLevel1.length,
       fillType === 0 ? 0 : TEST_SEGMENT_COUNT,
     );
 
@@ -373,7 +375,7 @@ const draw = (timeMs: number) => {
       .with(bindGroupLayout, uniformsBindGroup)
       .withColorAttachment(colorAttachment)
       .drawIndexed(
-        lineSegmentWireframeIndicesCapLevel3.length,
+        lineSegmentWireframeIndicesCapLevel1.length,
         TEST_SEGMENT_COUNT,
       );
   }

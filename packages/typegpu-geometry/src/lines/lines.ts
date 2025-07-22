@@ -169,7 +169,7 @@ export const lineSegmentVariableWidth = tgpu.fn([
   if (isCap) {
     let vertexPosition = vec2f();
     if (isCSide) {
-      vertexPosition = startCapSlot.$(
+      vertexPosition = endCapSlot.$(
         vertexIndex,
         joinPath,
         V,
@@ -180,7 +180,7 @@ export const lineSegmentVariableWidth = tgpu.fn([
         j4,
       );
     } else {
-      vertexPosition = endCapSlot.$(
+      vertexPosition = startCapSlot.$(
         vertexIndex,
         joinPath,
         V,
