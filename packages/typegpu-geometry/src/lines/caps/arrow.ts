@@ -20,23 +20,26 @@ export const arrowCap = tgpu.fn([
     V,
     vu,
     vd,
-    right,
+    _right,
     dir,
-    left,
+    _left,
   ) => {
     const dirRight = rot90cw(dir);
     const dirLeft = rot90ccw(dir);
 
+    const v0 = addMul(vu, dir, -7.5 * V.radius);
+    const v1 = addMul(V.position, addMul(dirRight, dir, -3), 3 * V.radius);
+    const v2 = addMul(V.position, vec2f(0, 0), 2 * V.radius);
+    const v3 = addMul(V.position, addMul(dirLeft, dir, -3), 3 * V.radius);
+    const v4 = addMul(vd, dir, -7.5 * V.radius);
+    const points = [v0, v1, v2, v3, v4];
+
     if (joinPath.depth >= 0) {
-      const remove = [right, left];
+      const remove = [v0, v4];
       const dm = remove[joinPath.joinIndex & 0x1] as v2f;
-      return addMul(V.position, dm, V.radius);
+      return dm;
     }
 
-    const v1 = addMul(V.position, addMul(dirRight, dir, -1), 2 * V.radius);
-    const v2 = addMul(V.position, vec2f(0, 0), 2 * V.radius);
-    const v3 = addMul(V.position, addMul(dirLeft, dir, -1), 2 * V.radius);
-    const points = [vu, v1, v2, v3, vd];
     return points[vertexIndex % 5] as v2f;
   },
 );

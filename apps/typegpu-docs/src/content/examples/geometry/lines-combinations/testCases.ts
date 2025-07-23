@@ -2,7 +2,17 @@ import { LineSegmentVertex } from '@typegpu/geometry';
 import { perlin2d } from '@typegpu/noise';
 import tgpu from 'typegpu';
 import { arrayOf, f32, i32, mat2x2f, u32, vec2f } from 'typegpu/data';
-import { add, clamp, cos, floor, mul, pow, select, sin } from 'typegpu/std';
+import {
+  abs,
+  add,
+  clamp,
+  cos,
+  floor,
+  mul,
+  pow,
+  select,
+  sin,
+} from 'typegpu/std';
 import { TEST_SEGMENT_COUNT } from './constants.ts';
 import {
   randFloat01,
@@ -85,6 +95,15 @@ export const halfCircle = testCaseShell(
   },
 );
 
+export const halfCircleThin = testCaseShell(
+  (vertexIndex, t) => {
+    'kernel';
+    const result = halfCircle(vertexIndex, t);
+    result.radius = 0.01;
+    return result;
+  },
+);
+
 export const bending = testCaseShell(
   (vertexIndex, t) => {
     'kernel';
@@ -131,6 +150,23 @@ export const perlinTraces = testCaseShell(
         radiusFactor * radiusFactor,
         -1,
         vertexIndex % perLine === 0,
+      ),
+    });
+  },
+);
+
+export const bars = testCaseShell(
+  (vertexIndex, t) => {
+    'kernel';
+    const lineIndex = floor(f32(vertexIndex) / 5);
+    const y = f32(clamp(vertexIndex % 5, 1, 2) - 1);
+    const x = 20 * (2 * 5 * lineIndex / f32(TEST_SEGMENT_COUNT) - 1);
+    return LineSegmentVertex({
+      position: vec2f(0.8 * x, 0.8 * y * sin(x + t)),
+      radius: select(
+        clamp(0.08 * abs(sin(x + t)), 0, 0.01),
+        -1,
+        vertexIndex % 5 === 4,
       ),
     });
   },
