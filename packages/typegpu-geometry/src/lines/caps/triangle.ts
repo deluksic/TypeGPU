@@ -1,19 +1,8 @@
-import tgpu from 'typegpu';
-import { u32, vec2f } from 'typegpu/data';
 import type { v2f } from 'typegpu/data';
 import { addMul } from '../../utils.ts';
-import { JoinPath, LineSegmentVertex } from '../types.ts';
+import { capShell } from './common.ts';
 
-export const triangleCap = tgpu.fn([
-  u32,
-  JoinPath,
-  LineSegmentVertex,
-  vec2f,
-  vec2f,
-  vec2f,
-  vec2f,
-  vec2f,
-], vec2f)(
+export const triangleCap = capShell(
   (
     vertexIndex,
     joinPath,
@@ -24,6 +13,7 @@ export const triangleCap = tgpu.fn([
     dir,
     left,
   ) => {
+    'kernel';
     if (joinPath.depth >= 0) {
       const remove = [right, left];
       const dm = remove[joinPath.joinIndex & 0x1] as v2f;

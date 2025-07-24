@@ -1,21 +1,11 @@
-import tgpu from 'typegpu';
-import { u32, vec2f } from 'typegpu/data';
+import { vec2f } from 'typegpu/data';
 import type { v2f } from 'typegpu/data';
 import { dot, select } from 'typegpu/std';
 import { addMul, rot90ccw, rot90cw } from '../../utils.ts';
-import { JoinPath, LineSegmentVertex } from '../types.ts';
 import { intersectTangent, miterPointNoCheck } from '../utils.ts';
+import { capShell } from './common.ts';
 
-export const buttCap = tgpu.fn([
-  u32,
-  JoinPath,
-  LineSegmentVertex,
-  vec2f,
-  vec2f,
-  vec2f,
-  vec2f,
-  vec2f,
-], vec2f)(
+export const buttCap = capShell(
   (
     vertexIndex,
     joinPath,
@@ -26,6 +16,7 @@ export const buttCap = tgpu.fn([
     dir,
     left,
   ) => {
+    'kernel';
     const shouldJoin = dot(dir, right) < 0;
     const dirRight = rot90cw(dir);
     const dirLeft = rot90ccw(dir);
@@ -44,12 +35,12 @@ export const buttCap = tgpu.fn([
     const joinIndex = joinPath.joinIndex;
     if (joinPath.depth >= 0) {
       const miterR = select(
-        right,
+        u,
         miterPointNoCheck(right, dirRight),
         shouldJoin,
       );
       const miterL = select(
-        left,
+        d,
         miterPointNoCheck(dirLeft, left),
         shouldJoin,
       );

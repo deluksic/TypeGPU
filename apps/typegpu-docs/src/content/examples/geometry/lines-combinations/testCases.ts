@@ -111,8 +111,9 @@ export const bending = testCaseShell(
     const x = 2 * i - 1;
     const s = sin(t);
     const n = 10 * s * s * s * s + 0.25;
+    const base = clamp(1 - pow(abs(x), n), 0, 1);
     return LineSegmentVertex({
-      position: vec2f(0.5 * x, 0.5 * pow(1 - pow(x, n), 1 / n)),
+      position: vec2f(0.5 * x, 0.5 * pow(base, 1 / n)),
       radius: 0.2,
     });
   },
@@ -158,9 +159,11 @@ export const perlinTraces = testCaseShell(
 export const bars = testCaseShell(
   (vertexIndex, t) => {
     'kernel';
-    const lineIndex = floor(f32(vertexIndex) / 5);
-    const y = f32(clamp(vertexIndex % 5, 1, 2) - 1);
-    const x = 20 * (2 * 5 * lineIndex / f32(TEST_SEGMENT_COUNT) - 1);
+    const VERTS_PER_LINE = u32(5);
+    const lineIndex = f32(vertexIndex / VERTS_PER_LINE);
+    const y = f32(clamp(vertexIndex % VERTS_PER_LINE, 1, 2) - 1);
+    const x = 20 *
+      (2 * f32(VERTS_PER_LINE) * lineIndex / TEST_SEGMENT_COUNT - 1);
     return LineSegmentVertex({
       position: vec2f(0.8 * x, 0.8 * y * sin(x + t)),
       radius: select(
@@ -192,7 +195,7 @@ export const arms = testCaseShell(
   },
 );
 
-export const aarmsSmall = testCaseShell(
+export const armsSmall = testCaseShell(
   (vertexIndex, t) => {
     'kernel';
     const result = arms(vertexIndex, t);

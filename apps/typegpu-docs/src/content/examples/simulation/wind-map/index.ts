@@ -44,7 +44,7 @@ const Uniforms = struct({
 });
 
 const uniformsBuffer = root.createBuffer(Uniforms, {
-  stepSize: 0.01,
+  stepSize: 0.008,
   frameCount: 0,
 }).$usage('uniform');
 

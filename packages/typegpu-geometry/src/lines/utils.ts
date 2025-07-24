@@ -73,9 +73,12 @@ export const miterLimit = tgpu.fn([vec2f, vec2f], MiterLimitResult)(
   (a, b) => {
     const sin_ = cross2d(a, b);
     const bisection = bisectCcw(a, b);
-    if (sin_ < 0) {
-      // if the miter is at infinity, just make it super far
-      const same = mul(bisection, -1e6);
+    const b2 = dot(b, b);
+    const cos_ = dot(a, b);
+    const diff = b2 - cos_;
+    if (sin_ < 1e-4) {
+      // the vectors are almost colinear
+      const same = bisection;
       return {
         left: same,
         mid: same,
@@ -83,12 +86,9 @@ export const miterLimit = tgpu.fn([vec2f, vec2f], MiterLimitResult)(
         shouldJoin: false,
       };
     }
-    const b2 = dot(b, b);
-    const cos_ = dot(a, b);
-    const diff = b2 - cos_;
-    if (sin_ < 1e-4) {
-      // the vectors are almost colinear
-      const same = bisection;
+    if (sin_ < 0) {
+      // if the miter is at infinity, just make it super far
+      const same = mul(bisection, -1e6);
       return {
         left: same,
         mid: same,

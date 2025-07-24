@@ -1,20 +1,9 @@
-import tgpu from 'typegpu';
-import { u32, vec2f } from 'typegpu/data';
 import type { v2f } from 'typegpu/data';
 import { select } from 'typegpu/std';
 import { addMul, bisectCcw, bisectNoCheck } from '../../utils.ts';
-import { JoinPath, LineSegmentVertex } from '../types.ts';
+import { capShell } from './common.ts';
 
-export const roundCap = tgpu.fn([
-  u32,
-  JoinPath,
-  LineSegmentVertex,
-  vec2f,
-  vec2f,
-  vec2f,
-  vec2f,
-  vec2f,
-], vec2f)(
+export const roundCap = capShell(
   (
     vertexIndex,
     joinPath,
@@ -25,6 +14,7 @@ export const roundCap = tgpu.fn([
     dir,
     left,
   ) => {
+    'kernel';
     const uR = right;
     const u = dir;
     const c = dir;

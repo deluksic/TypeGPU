@@ -1,25 +1,10 @@
-import tgpu from 'typegpu';
-import { JoinPath, LineSegmentVertex } from '../types.ts';
-import { bool, u32, vec2f } from 'typegpu/data';
 import type { v2f } from 'typegpu/data';
 import { add, mul, normalize, select } from 'typegpu/std';
 import { addMul, bisectCcw } from '../../utils.ts';
 import { intersectLines, miterLimit, miterPoint } from '../utils.ts';
+import { joinShell } from './common.ts';
 
-export const miterJoin = tgpu.fn([
-  u32,
-  u32,
-  JoinPath,
-  LineSegmentVertex,
-  vec2f,
-  vec2f,
-  vec2f,
-  vec2f,
-  vec2f,
-  vec2f,
-  bool,
-  bool,
-], vec2f)(
+export const miterJoin = joinShell(
   (
     situationIndex,
     vertexIndex,
@@ -34,6 +19,7 @@ export const miterJoin = tgpu.fn([
     joinU,
     joinD,
   ) => {
+    'kernel';
     const miterU = miterLimit(ur, ul);
     const miterD = miterLimit(dl, dr);
     const midR = bisectCcw(ur, dr);

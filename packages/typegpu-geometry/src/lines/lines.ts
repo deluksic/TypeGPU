@@ -8,6 +8,7 @@ import { JoinPath, LineSegmentVertex } from './types.ts';
 import { joinSituationIndex } from './joins/common.ts';
 import { roundJoin } from './joins/round.ts';
 import { roundCap } from './caps/round.ts';
+import { JOIN_LIMIT } from './constants.ts';
 
 export const joinSlot = tgpu.slot(roundJoin);
 export const startCapSlot = tgpu.slot(roundCap);
@@ -68,8 +69,8 @@ export const lineSegmentVariableWidth = tgpu.fn([
     };
   }
 
-  const isCapB = dot(AB, AB) <= radiusABDelta * radiusABDelta;
-  const isCapC = dot(CD, CD) <= radiusCDDelta * radiusCDDelta;
+  const isCapB = dot(AB, AB) <= radiusABDelta * radiusABDelta + 1e-12;
+  const isCapC = dot(CD, CD) <= radiusCDDelta * radiusCDDelta + 1e-12;
 
   const eAB = externalNormals(AB, A.radius, B.radius);
   const eBC = externalNormals(BC, B.radius, C.radius);
@@ -90,21 +91,33 @@ export const lineSegmentVariableWidth = tgpu.fn([
   let joinCu = true;
   let joinCd = true;
   if (!isCapB) {
-    if (situationIndexB === 1 || situationIndexB === 5) {
+    if (
+      situationIndexB === 1 || situationIndexB === 5 ||
+      dot(eBC.n2, eAB.n2) > JOIN_LIMIT.$
+    ) {
       d4 = miterPoint(eBC.n2, eAB.n2);
       joinBd = false;
     }
-    if (situationIndexB === 4 || situationIndexB === 5) {
+    if (
+      situationIndexB === 4 || situationIndexB === 5 ||
+      dot(eAB.n1, eBC.n1) > JOIN_LIMIT.$
+    ) {
       d0 = miterPoint(eAB.n1, eBC.n1);
       joinBu = false;
     }
   }
   if (!isCapC) {
-    if (situationIndexC === 4 || situationIndexC === 5) {
+    if (
+      situationIndexC === 4 || situationIndexC === 5 ||
+      dot(eCD.n2, eBC.n2) > JOIN_LIMIT.$
+    ) {
       d5 = miterPoint(eCD.n2, eBC.n2);
       joinCd = false;
     }
-    if (situationIndexC === 1 || situationIndexC === 5) {
+    if (
+      situationIndexC === 1 || situationIndexC === 5 ||
+      dot(eBC.n1, eCD.n1) > JOIN_LIMIT.$
+    ) {
       d9 = miterPoint(eBC.n1, eCD.n1);
       joinCu = false;
     }

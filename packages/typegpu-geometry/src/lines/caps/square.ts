@@ -1,21 +1,10 @@
-import tgpu from 'typegpu';
-import { u32, vec2f } from 'typegpu/data';
 import type { v2f } from 'typegpu/data';
 import { add, dot, select } from 'typegpu/std';
 import { addMul, rot90ccw, rot90cw } from '../../utils.ts';
-import { JoinPath, LineSegmentVertex } from '../types.ts';
 import { miterPointNoCheck } from '../utils.ts';
+import { capShell } from './common.ts';
 
-export const squareCap = tgpu.fn([
-  u32,
-  JoinPath,
-  LineSegmentVertex,
-  vec2f,
-  vec2f,
-  vec2f,
-  vec2f,
-  vec2f,
-], vec2f)(
+export const squareCap = capShell(
   (
     vertexIndex,
     joinPath,
@@ -26,6 +15,7 @@ export const squareCap = tgpu.fn([
     dir,
     left,
   ) => {
+    'kernel';
     const shouldJoin = dot(dir, right) < 0;
     const dirRight = rot90cw(dir);
     const dirLeft = rot90ccw(dir);

@@ -1,19 +1,9 @@
-import tgpu from 'typegpu';
-import { u32, vec2f } from 'typegpu/data';
+import { vec2f } from 'typegpu/data';
 import type { v2f } from 'typegpu/data';
 import { addMul, rot90ccw, rot90cw } from '../../utils.ts';
-import { JoinPath, LineSegmentVertex } from '../types.ts';
+import { capShell } from './common.ts';
 
-export const arrowCap = tgpu.fn([
-  u32,
-  JoinPath,
-  LineSegmentVertex,
-  vec2f,
-  vec2f,
-  vec2f,
-  vec2f,
-  vec2f,
-], vec2f)(
+export const arrowCap = capShell(
   (
     vertexIndex,
     joinPath,
@@ -24,6 +14,7 @@ export const arrowCap = tgpu.fn([
     dir,
     _left,
   ) => {
+    'kernel';
     const dirRight = rot90cw(dir);
     const dirLeft = rot90ccw(dir);
 
