@@ -3,7 +3,6 @@ import { arrayOf, bool, f32, struct, u32, vec2f } from 'typegpu/data';
 import {
   add,
   clamp,
-  distance,
   dot,
   length,
   max,
@@ -129,13 +128,26 @@ export const limitTowardsMiddle = tgpu.fn(
   },
 );
 
-export const distanceToLineSegment = tgpu.fn([vec2f, vec2f, vec2f], f32)(
+export const projectToLineSegment = tgpu.fn([vec2f, vec2f, vec2f], vec2f)(
   (A, B, point) => {
     const p = sub(point, A);
     const AB = sub(B, A);
     const t = clamp(dot(p, AB) / dot(AB, AB), 0, 1);
     const projP = addMul(A, AB, t);
-    return distance(point, projP);
+    return projP;
+  },
+);
+
+export const uvToLineSegment = tgpu.fn(
+  [vec2f, vec2f, vec2f],
+  vec2f,
+)(
+  (A, B, point) => {
+    const p = sub(point, A);
+    const AB = sub(B, A);
+    const x = dot(p, AB) / dot(AB, AB);
+    const y = cross2d(normalize(AB), p);
+    return vec2f(x, y);
   },
 );
 

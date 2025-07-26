@@ -8,10 +8,12 @@ import {
   lineJoins,
   lineSegmentIndicesCapLevel0,
   lineSegmentIndicesCapLevel1,
+  lineSegmentIndicesCapLevel2,
   lineSegmentIndicesCapLevel3,
   lineSegmentVariableWidth,
   lineSegmentWireframeIndicesCapLevel0,
   lineSegmentWireframeIndicesCapLevel1,
+  lineSegmentWireframeIndicesCapLevel2,
   lineSegmentWireframeIndicesCapLevel3,
   startCapSlot,
 } from '@typegpu/geometry';
@@ -30,6 +32,7 @@ import {
 } from 'typegpu/data';
 import * as testCases from './testCases.ts';
 import { TEST_SEGMENT_COUNT } from './constants.ts';
+import { uvToLineSegment } from '../../../../../../../packages/typegpu-geometry/src/lines/utils.ts';
 
 const presentationFormat = navigator.gpu.getPreferredCanvasFormat();
 const canvas = document.querySelector('canvas');
@@ -99,6 +102,7 @@ const mainVertex = tgpu['~unstable'].vertexFn({
   out: {
     outPos: builtin.position,
     position: vec2f,
+    uv: vec2f,
     instanceIndex: interpolate('flat', u32),
     vertexIndex: interpolate('flat', u32),
     situationIndex: interpolate('flat', u32),
@@ -115,6 +119,7 @@ const mainVertex = tgpu['~unstable'].vertexFn({
     return {
       outPos: vec4f(),
       position: vec2f(),
+      uv: vec2f(),
       instanceIndex: 0,
       vertexIndex: 0,
       situationIndex: 0,
@@ -122,10 +127,12 @@ const mainVertex = tgpu['~unstable'].vertexFn({
   }
 
   const result = lineSegmentVariableWidth(vertexIndex, A, B, C, D);
+  const uv = uvToLineSegment(B.position, C.position, result.vertexPosition);
 
   return {
     outPos: vec4f(result.vertexPosition, 0, 1),
     position: result.vertexPosition,
+    uv: uv,
     instanceIndex,
     vertexIndex,
     situationIndex: result.situationIndex,
@@ -142,6 +149,7 @@ const mainFragment = tgpu['~unstable'].fragmentFn({
     frontFacing: builtin.frontFacing,
     screenPosition: builtin.position,
     position: vec2f,
+    uv: vec2f,
   },
   out: vec4f,
 })(
@@ -153,6 +161,7 @@ const mainFragment = tgpu['~unstable'].fragmentFn({
       frontFacing,
       screenPosition,
       position,
+      uv,
     },
   ) => {
     const fillType = bindGroupLayout.$.uniforms.fillType;
@@ -164,13 +173,7 @@ const mainFragment = tgpu['~unstable'].fragmentFn({
         position.x * 0.5 + 0.5,
       );
     }
-    let index = instanceIndex;
-    if (fillType === 3) {
-      index = vertexIndex;
-    }
-    if (fillType === 4) {
-      index = situationIndex;
-    }
+    let color = vec3f();
     const colors = [
       vec3f(1, 0, 0), // 0
       vec3f(0, 1, 0), // 1
@@ -182,7 +185,18 @@ const mainFragment = tgpu['~unstable'].fragmentFn({
       vec3f(0.25, 0.75, 0.25), // 7
       vec3f(0.25, 0.25, 0.75), // 8
     ];
-    const color = colors[index % colors.length];
+    if (fillType === 2) {
+      color = colors[instanceIndex % colors.length];
+    }
+    if (fillType === 3) {
+      color = colors[vertexIndex % colors.length];
+    }
+    if (fillType === 4) {
+      color = colors[situationIndex % colors.length];
+    }
+    if (fillType === 5) {
+      color = vec3f(uv.x, cos(uv.y * 100), 0);
+    }
     if (frontFacing) {
       return vec4f(color, 0.5);
     }
@@ -346,6 +360,10 @@ let wireframe = true;
 let fillType = 1;
 let animationSpeed = 1;
 let reverse = false;
+let subdiv = {
+  fillCount: lineSegmentIndicesCapLevel3.length,
+  wireframeCount: lineSegmentWireframeIndicesCapLevel3.length,
+};
 
 const draw = (timeMs: number) => {
   uniformsBuffer.writePartial({
@@ -366,7 +384,7 @@ const draw = (timeMs: number) => {
       }
     })
     .drawIndexed(
-      lineSegmentIndicesCapLevel1.length,
+      subdiv.fillCount,
       fillType === 0 ? 0 : TEST_SEGMENT_COUNT,
     );
 
@@ -375,7 +393,7 @@ const draw = (timeMs: number) => {
       .with(bindGroupLayout, uniformsBindGroup)
       .withColorAttachment(colorAttachment)
       .drawIndexed(
-        lineSegmentWireframeIndicesCapLevel1.length,
+        subdiv.wireframeCount,
         TEST_SEGMENT_COUNT,
       );
   }
@@ -410,7 +428,27 @@ const fillOptions = {
   instance: 2,
   triangle: 3,
   situation: 4,
+  distanceToSegment: 5,
 };
+
+const subdivs = [
+  {
+    fillCount: lineSegmentIndicesCapLevel0.length,
+    wireframeCount: lineSegmentWireframeIndicesCapLevel0.length,
+  },
+  {
+    fillCount: lineSegmentIndicesCapLevel1.length,
+    wireframeCount: lineSegmentWireframeIndicesCapLevel1.length,
+  },
+  {
+    fillCount: lineSegmentIndicesCapLevel2.length,
+    wireframeCount: lineSegmentWireframeIndicesCapLevel2.length,
+  },
+  {
+    fillCount: lineSegmentIndicesCapLevel3.length,
+    wireframeCount: lineSegmentWireframeIndicesCapLevel3.length,
+  },
+];
 
 export const controls = {
   'Test Case': {
@@ -422,7 +460,7 @@ export const controls = {
     },
   },
   'Start Cap': {
-    initial: 'butt',
+    initial: 'round',
     options: Object.keys(lineCaps),
     onSelectChange: async (selected: keyof typeof lineCaps) => {
       startCap = lineCaps[selected];
@@ -430,7 +468,7 @@ export const controls = {
     },
   },
   'End Cap': {
-    initial: 'butt',
+    initial: 'round',
     options: Object.keys(lineCaps),
     onSelectChange: async (selected: keyof typeof lineCaps) => {
       endCap = lineCaps[selected];
@@ -438,7 +476,7 @@ export const controls = {
     },
   },
   'Join': {
-    initial: 'miter',
+    initial: 'round',
     options: Object.keys(lineJoins),
     onSelectChange: async (selected: keyof typeof lineJoins) => {
       join = lineJoins[selected];
@@ -446,11 +484,20 @@ export const controls = {
     },
   },
   'Fill': {
-    initial: 'solid',
+    initial: 'distanceToSegment',
     options: Object.keys(fillOptions),
     onSelectChange: async (selected: keyof typeof fillOptions) => {
       fillType = fillOptions[selected];
       uniformsBuffer.writePartial({ fillType });
+    },
+  },
+  'Subdiv. Level': {
+    initial: 1,
+    min: 0,
+    step: 1,
+    max: 3,
+    onSliderChange: (value: number) => {
+      subdiv = subdivs[value];
     },
   },
   'Wireframe': {

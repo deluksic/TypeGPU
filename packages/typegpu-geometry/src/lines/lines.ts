@@ -172,58 +172,33 @@ export const lineSegmentVariableWidth = tgpu.fn([
     const shouldJoin = [u32(joinBu), u32(joinBd), u32(joinCd), u32(joinCu)];
     if (shouldJoin[joinIndex] === 0) {
       const noJoinPoints = [v0, v4, v5, v9];
+      const vertexPosition = noJoinPoints[joinIndex] as v2f;
       return {
         situationIndex,
-        vertexPosition: noJoinPoints[joinIndex] as v2f,
+        vertexPosition,
       };
     }
   }
 
+  let vertexPosition = vec2f();
+
+  // deno-fmt-ignore
   if (isCap) {
-    let vertexPosition = vec2f();
     if (isCSide) {
-      vertexPosition = endCapSlot.$(
-        vertexIndex,
-        joinPath,
-        V,
-        vu,
-        vd,
-        j2,
-        nBC,
-        j4,
-      );
+      vertexPosition =   endCapSlot.$(vertexIndex, joinPath, V, vu, vd, j2, nBC, j4);
     } else {
-      vertexPosition = startCapSlot.$(
-        vertexIndex,
-        joinPath,
-        V,
-        vu,
-        vd,
-        j2,
-        nCB,
-        j4,
-      );
+      vertexPosition = startCapSlot.$(vertexIndex, joinPath, V, vu, vd, j2, nCB, j4);
     }
-    return {
-      situationIndex,
-      vertexPosition,
-    };
+  } else {
+    vertexPosition = joinSlot.$(
+      situationIndex, vertexIndex,
+      joinPath,
+      V, vu, vd,
+      j1, j2, j3, j4,
+      joinU, joinD
+    );
   }
 
-  const vertexPosition = joinSlot.$(
-    situationIndex,
-    vertexIndex,
-    joinPath,
-    V,
-    vu,
-    vd,
-    j1,
-    j2,
-    j3,
-    j4,
-    joinU,
-    joinD,
-  );
   return {
     situationIndex,
     vertexPosition,

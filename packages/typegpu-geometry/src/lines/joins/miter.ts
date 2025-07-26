@@ -7,12 +7,16 @@ import { f32, type v2f, vec2f } from 'typegpu/data';
 
 export const miterJoinLimitSlot = tgpu.slot(2);
 
-export const miterLimit = tgpu.fn([vec2f, f32], vec2f)((miter, limit) => {
+/**
+ * Limits the miter point to the given limit ratio, which is
+ * a length relative to the line vertex radius.
+ */
+export const miterLimit = tgpu.fn([vec2f, f32], vec2f)((miter, limitRatio) => {
   const m2 = dot(miter, miter);
-  if (m2 > limit * limit) {
+  if (m2 > limitRatio * limitRatio) {
     return mul(
       normalize(miter),
-      (limit - 1) * (limit * limit - 1) / (m2 - 1) + 1,
+      (limitRatio - 1) * (limitRatio * limitRatio - 1) / (m2 - 1) + 1,
     );
   }
   return miter;

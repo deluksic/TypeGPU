@@ -4,4 +4,3 @@ export * from './lines/joins/index.ts';
 export * from './lines/caps/index.ts';
 export * from './lines/indices.ts';
 export * from './lines/types.ts';
-export { distanceToLineSegment } from './lines/utils.ts';
