@@ -1,8 +1,22 @@
-import type { v2f } from 'typegpu/data';
-import { add, mul, normalize, select } from 'typegpu/std';
+import tgpu from 'typegpu';
+import { add, dot, mul, normalize, select } from 'typegpu/std';
 import { addMul, bisectCcw } from '../../utils.ts';
-import { intersectLines, miterLimit, miterPoint } from '../utils.ts';
+import { intersectLines, miterPoint } from '../utils.ts';
 import { joinShell } from './common.ts';
+import { f32, type v2f, vec2f } from 'typegpu/data';
+
+export const miterJoinLimitSlot = tgpu.slot(2);
+
+export const miterLimit = tgpu.fn([vec2f, f32], vec2f)((miter, limit) => {
+  const m2 = dot(miter, miter);
+  if (m2 > limit * limit) {
+    return mul(
+      normalize(miter),
+      (limit - 1) * (limit * limit - 1) / (m2 - 1) + 1,
+    );
+  }
+  return miter;
+});
 
 export const miterJoin = joinShell(
   (
@@ -20,40 +34,42 @@ export const miterJoin = joinShell(
     joinD,
   ) => {
     'kernel';
-    const miterU = miterLimit(ur, ul);
-    const miterD = miterLimit(dl, dr);
-    const midR = bisectCcw(ur, dr);
-    const midL = bisectCcw(dl, ul);
+    let miterU = miterPoint(ur, ul);
+    let miterD = miterPoint(dl, dr);
+    miterU = miterLimit(miterU, miterJoinLimitSlot.$);
+    miterD = miterLimit(miterD, miterJoinLimitSlot.$);
 
     const shouldCross = situationIndex === 1 || situationIndex === 4;
     const crossCenter = intersectLines(ul, dl, ur, dr).point;
     const averageCenter = mul(
       add(
-        normalize(miterU.mid),
-        normalize(miterD.mid),
+        normalize(miterU),
+        normalize(miterD),
       ),
       0.5,
     );
 
     let uR = ur;
-    let u = miterU.mid;
+    let u = miterU;
     let c = select(averageCenter, crossCenter, shouldCross);
-    let d = miterD.mid;
+    let d = miterD;
     let dR = dr;
 
     if (situationIndex === 2) {
+      const mid = bisectCcw(ur, dr);
       uR = ur;
-      u = midR;
-      c = midR;
-      d = midR;
+      u = mid;
+      c = mid;
+      d = mid;
       dR = dr;
     }
 
     if (situationIndex === 3) {
+      const mid = bisectCcw(dl, ul);
       uR = ur;
-      u = midL;
-      c = midL;
-      d = midL;
+      u = mid;
+      c = mid;
+      d = mid;
       dR = dr;
     }
 
