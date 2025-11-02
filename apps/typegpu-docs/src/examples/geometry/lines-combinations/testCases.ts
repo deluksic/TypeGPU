@@ -21,7 +21,7 @@ import {
 
 const testCaseShell = tgpu.fn([u32, f32], LineSegmentVertex);
 
-const segmentSide = tgpu['~unstable'].const(arrayOf(f32, 4), [-1, -1, 1, 1]);
+const segmentSide = tgpu.const(arrayOf(f32, 4), [-1, -1, 1, 1]);
 
 export const segmentAlternate = testCaseShell(
   (vertexIndex, t) => {
@@ -160,7 +160,7 @@ export const bars = testCaseShell(
   (vertexIndex, t) => {
     'use gpu';
     const VERTS_PER_LINE = u32(5);
-    const lineIndex = f32(vertexIndex / VERTS_PER_LINE);
+    const lineIndex = f32(u32(vertexIndex / VERTS_PER_LINE));
     const y = f32(clamp(vertexIndex % VERTS_PER_LINE, 1, 2) - 1);
     const x = 20 *
       (2 * f32(VERTS_PER_LINE) * lineIndex / TEST_SEGMENT_COUNT - 1);
@@ -240,7 +240,7 @@ export const armsRotating = testCaseShell(
 export const flyingSquares = testCaseShell(
   (vertexIndex, t) => {
     'use gpu';
-    const squareIndex = vertexIndex / 8;
+    const squareIndex = u32(vertexIndex / 8);
     randSeed(f32(squareIndex + 5));
     const squarePoints = [
       vec2f(-1, -1),
