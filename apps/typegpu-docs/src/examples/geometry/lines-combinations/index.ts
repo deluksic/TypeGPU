@@ -1,5 +1,5 @@
 import tgpu from 'typegpu';
-import type { ColorAttachment } from '../../../../../../../packages/typegpu/src/core/pipeline/renderPipeline.ts';
+import type { ColorAttachment } from '../../../../../../packages/typegpu/src/core/pipeline/renderPipeline.ts';
 import { clamp, cos, min, mix, select, sin } from 'typegpu/std';
 import {
   endCapSlot,
@@ -17,7 +17,7 @@ import {
   lineSegmentWireframeIndicesCapLevel3,
   startCapSlot,
 } from '@typegpu/geometry';
-import { addMul } from '../../../../../../../packages/typegpu-geometry/src/utils.ts';
+import { addMul } from '../../../../../../packages/typegpu-geometry/src/utils.ts';
 import {
   arrayOf,
   builtin,
@@ -32,7 +32,7 @@ import {
 } from 'typegpu/data';
 import * as testCases from './testCases.ts';
 import { TEST_SEGMENT_COUNT } from './constants.ts';
-import { uvToLineSegment } from '../../../../../../../packages/typegpu-geometry/src/lines/utils.ts';
+import { uvToLineSegment } from '../../../../../../packages/typegpu-geometry/src/lines/utils.ts';
 
 const presentationFormat = navigator.gpu.getPreferredCanvasFormat();
 const canvas = document.querySelector('canvas');
@@ -108,6 +108,7 @@ const mainVertex = tgpu['~unstable'].vertexFn({
     situationIndex: interpolate('flat', u32),
   },
 })(({ vertexIndex, instanceIndex }) => {
+  'use gpu';
   const t = bindGroupLayout.$.uniforms.time;
   const A = testCaseSlot.$(instanceIndex, t);
   const B = testCaseSlot.$(instanceIndex + 1, t);
@@ -164,6 +165,7 @@ const mainFragment = tgpu['~unstable'].fragmentFn({
       uv,
     },
   ) => {
+    'use gpu';
     const fillType = bindGroupLayout.$.uniforms.fillType;
     if (fillType === 1) {
       // typegpu gradient

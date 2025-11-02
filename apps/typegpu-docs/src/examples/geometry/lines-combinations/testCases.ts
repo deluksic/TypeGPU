@@ -17,7 +17,7 @@ import { TEST_SEGMENT_COUNT } from './constants.ts';
 import {
   randFloat01,
   randSeed,
-} from '../../../../../../../packages/typegpu-noise/src/random.ts';
+} from '../../../../../../packages/typegpu-noise/src/random.ts';
 
 const testCaseShell = tgpu.fn([u32, f32], LineSegmentVertex);
 
@@ -25,7 +25,7 @@ const segmentSide = tgpu['~unstable'].const(arrayOf(f32, 4), [-1, -1, 1, 1]);
 
 export const segmentAlternate = testCaseShell(
   (vertexIndex, t) => {
-    'kernel';
+    'use gpu';
     const side = segmentSide.$[vertexIndex];
     const r = sin(t + select(0, Math.PI / 2, side === -1));
     const radius = 0.4 * r * r;
@@ -38,7 +38,7 @@ export const segmentAlternate = testCaseShell(
 
 export const segmentStretch = testCaseShell(
   (vertexIndex, t) => {
-    'kernel';
+    'use gpu';
     const side = segmentSide.$[vertexIndex];
     const distance = 0.5 * clamp(0.55 * sin(1.5 * t) + 0.5, 0, 1);
     return LineSegmentVertex({
@@ -50,7 +50,7 @@ export const segmentStretch = testCaseShell(
 
 export const segmentContainsAnotherEnd = testCaseShell(
   (vertexIndex, t) => {
-    'kernel';
+    'use gpu';
     const side = segmentSide.$[vertexIndex];
     return LineSegmentVertex({
       position: vec2f(side * 0.25 * (1 + clamp(sin(t), -0.8, 1)), 0),
@@ -61,7 +61,7 @@ export const segmentContainsAnotherEnd = testCaseShell(
 
 export const caseVShapeSmall = testCaseShell(
   (vertexIndex, t) => {
-    'kernel';
+    'use gpu';
     const side = clamp(f32(vertexIndex) - 2, -1, 1);
     const isMiddle = side === 0;
     return LineSegmentVertex({
@@ -73,7 +73,7 @@ export const caseVShapeSmall = testCaseShell(
 
 export const caseVShapeBig = testCaseShell(
   (vertexIndex, t) => {
-    'kernel';
+    'use gpu';
     const side = clamp(f32(vertexIndex) - 2, -1, 1);
     const isMiddle = side === 0;
     return LineSegmentVertex({
@@ -85,7 +85,7 @@ export const caseVShapeBig = testCaseShell(
 
 export const halfCircle = testCaseShell(
   (vertexIndex, t) => {
-    'kernel';
+    'use gpu';
     const angle = Math.PI * clamp(f32(vertexIndex) - 1, 0, 50) / 50;
     const radius = 0.5 * cos(t);
     return LineSegmentVertex({
@@ -97,7 +97,7 @@ export const halfCircle = testCaseShell(
 
 export const halfCircleThin = testCaseShell(
   (vertexIndex, t) => {
-    'kernel';
+    'use gpu';
     const result = halfCircle(vertexIndex, t);
     result.radius = 0.01;
     return result;
@@ -106,7 +106,7 @@ export const halfCircleThin = testCaseShell(
 
 export const bending = testCaseShell(
   (vertexIndex, t) => {
-    'kernel';
+    'use gpu';
     const i = clamp(f32(vertexIndex) - 1, 0, 48) / 48;
     const x = 2 * i - 1;
     const s = sin(t);
@@ -121,7 +121,7 @@ export const bending = testCaseShell(
 
 export const animateWidth = testCaseShell(
   (vertexIndex, t) => {
-    'kernel';
+    'use gpu';
     const i = (f32(vertexIndex) % TEST_SEGMENT_COUNT) / TEST_SEGMENT_COUNT;
     const x = cos(4 * 2 * Math.PI * i + Math.PI / 2);
     const y = cos(5 * 2 * Math.PI * i);
@@ -134,7 +134,7 @@ export const animateWidth = testCaseShell(
 
 export const perlinTraces = testCaseShell(
   (vertexIndex, t) => {
-    'kernel';
+    'use gpu';
     const perLine = u32(200);
     const n = floor(f32(vertexIndex) / f32(perLine));
     const x =
@@ -158,7 +158,7 @@ export const perlinTraces = testCaseShell(
 
 export const bars = testCaseShell(
   (vertexIndex, t) => {
-    'kernel';
+    'use gpu';
     const VERTS_PER_LINE = u32(5);
     const lineIndex = f32(vertexIndex / VERTS_PER_LINE);
     const y = f32(clamp(vertexIndex % VERTS_PER_LINE, 1, 2) - 1);
@@ -177,7 +177,7 @@ export const bars = testCaseShell(
 
 export const arms = testCaseShell(
   (vertexIndex, t) => {
-    'kernel';
+    'use gpu';
     const s = sin(t);
     const c = cos(t);
     const r = 0.25;
@@ -197,7 +197,7 @@ export const arms = testCaseShell(
 
 export const armsSmall = testCaseShell(
   (vertexIndex, t) => {
-    'kernel';
+    'use gpu';
     const result = arms(vertexIndex, t);
     return LineSegmentVertex({
       position: result.position,
@@ -208,7 +208,7 @@ export const armsSmall = testCaseShell(
 
 export const armsBig = testCaseShell(
   (vertexIndex, t) => {
-    'kernel';
+    'use gpu';
     const result = arms(vertexIndex, t);
     return LineSegmentVertex({
       position: result.position,
@@ -219,7 +219,7 @@ export const armsBig = testCaseShell(
 
 export const armsRotating = testCaseShell(
   (vertexIndex, t) => {
-    'kernel';
+    'use gpu';
     const s = sin(t);
     const c = cos(t);
     const r = 0.25;
@@ -239,7 +239,7 @@ export const armsRotating = testCaseShell(
 
 export const flyingSquares = testCaseShell(
   (vertexIndex, t) => {
-    'kernel';
+    'use gpu';
     const squareIndex = vertexIndex / 8;
     randSeed(f32(squareIndex + 5));
     const squarePoints = [

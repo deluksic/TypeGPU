@@ -16,7 +16,7 @@ export const buttCap = capShell(
     dir,
     left,
   ) => {
-    'kernel';
+    'use gpu';
     const shouldJoin = dot(dir, right) < 0;
     const dirRight = rot90cw(dir);
     const dirLeft = rot90ccw(dir);

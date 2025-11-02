@@ -151,7 +151,7 @@ export const uvToLineSegment = tgpu.fn(
   },
 );
 
-const lookup = tgpu['~unstable'].const(arrayOf(u32, 8), [
+const lookup = tgpu.const(arrayOf(u32, 8), [
   5, // 000 c >= b >= a
   3, // 001 INVALID
   4, // 010 b > c >= a

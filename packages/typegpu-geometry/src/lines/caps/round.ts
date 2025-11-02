@@ -14,7 +14,7 @@ export const roundCap = capShell(
     dir,
     left,
   ) => {
-    'kernel';
+    'use gpu';
     const uR = right;
     const u = dir;
     const c = dir;

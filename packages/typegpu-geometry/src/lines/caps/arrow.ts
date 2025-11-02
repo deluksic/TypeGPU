@@ -14,7 +14,7 @@ export const arrowCap = capShell(
     dir,
     _left,
   ) => {
-    'kernel';
+    'use gpu';
     const dirRight = rot90cw(dir);
     const dirLeft = rot90ccw(dir);
 

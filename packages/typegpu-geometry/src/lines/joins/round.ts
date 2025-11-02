@@ -19,7 +19,7 @@ export const roundJoin = joinShell(
     joinU,
     joinD,
   ) => {
-    'kernel';
+    'use gpu';
     const midU = bisectCcw(ur, ul);
     const midD = bisectCcw(dl, dr);
     const midR = bisectCcw(ur, dr);

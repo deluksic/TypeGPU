@@ -2,7 +2,7 @@ import tgpu from 'typegpu';
 import { f32, struct, u32, vec2f } from 'typegpu/data';
 import { cos, select, sin } from 'typegpu/std';
 
-const PI = tgpu['~unstable'].const(f32, Math.PI);
+const PI = tgpu.const(f32, Math.PI);
 
 const SubdivLevelResult = struct({
   level: u32,

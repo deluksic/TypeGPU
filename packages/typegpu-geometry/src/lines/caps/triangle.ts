@@ -13,7 +13,7 @@ export const triangleCap = capShell(
     dir,
     left,
   ) => {
-    'kernel';
+    'use gpu';
     if (joinPath.depth >= 0) {
       const remove = [right, left];
       const dm = remove[joinPath.joinIndex & 0x1] as v2f;

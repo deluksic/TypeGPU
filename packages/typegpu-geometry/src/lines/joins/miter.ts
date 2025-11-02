@@ -37,7 +37,7 @@ export const miterJoin = joinShell(
     joinU,
     joinD,
   ) => {
-    'kernel';
+    'use gpu';
     let miterU = miterPoint(ur, ul);
     let miterD = miterPoint(dl, dr);
     miterU = miterLimit(miterU, miterJoinLimitSlot.$);
