@@ -378,7 +378,7 @@ const draw = (timeMs: number) => {
     storeOp: 'store',
   };
   pipelines.fill
-    .with(bindGroupLayout, uniformsBindGroup)
+    .with(uniformsBindGroup)
     .withColorAttachment({ ...colorAttachment, loadOp: 'clear' })
     .withPerformanceCallback((start, end) => {
       if (frameId % 20 === 0) {
@@ -392,7 +392,7 @@ const draw = (timeMs: number) => {
 
   if (wireframe) {
     pipelines.outline
-      .with(bindGroupLayout, uniformsBindGroup)
+      .with(uniformsBindGroup)
       .withColorAttachment(colorAttachment)
       .drawIndexed(
         subdiv.wireframeCount,
@@ -401,12 +401,12 @@ const draw = (timeMs: number) => {
   }
   if (showRadii) {
     pipelines.circles
-      .with(bindGroupLayout, uniformsBindGroup)
+      .with(uniformsBindGroup)
       .withColorAttachment(colorAttachment)
       .draw(CIRCLE_SEGMENT_COUNT + 1, TEST_SEGMENT_COUNT);
 
     pipelines.centerline
-      .with(bindGroupLayout, uniformsBindGroup)
+      .with(uniformsBindGroup)
       .withColorAttachment(colorAttachment)
       .draw(TEST_SEGMENT_COUNT);
   }

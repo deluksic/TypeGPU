@@ -141,7 +141,7 @@ const mainVertex = tgpu['~unstable'].vertexFn({
   },
 })(({ vertexIndex, instanceIndex }) => {
   const frameCount = bindGroupLayout.$.uniforms.frameCount;
-  const particleIndex = instanceIndex / TRAIL_LENGTH;
+  const particleIndex = u32(instanceIndex / TRAIL_LENGTH);
   const trailIndexOriginal = instanceIndex % TRAIL_LENGTH;
   const currentPosIndex = frameCount % TRAIL_LENGTH;
   const trailIndex = i32(TRAIL_LENGTH + currentPosIndex - trailIndexOriginal) %

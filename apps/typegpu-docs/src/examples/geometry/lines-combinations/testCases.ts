@@ -255,9 +255,8 @@ export const flyingSquares = testCaseShell(
     const c = cos(t * rotationSpeed);
     const rotate = mat2x2f(c, -s, s, c);
     const r = 0.1 + 0.05 * randFloat01();
-    // TODO: why do I need to wrap with f32?
-    const x = f32(2.0 * randFloat01() - 1);
-    const y = f32(2.0 * randFloat01() - 1);
+    const x = 2.0 * randFloat01() - 1;
+    const y = 2.0 * randFloat01() - 1;
     const transformedPoint = add(vec2f(x, y), mul(rotate, mul(point, r)));
     return LineSegmentVertex({
       position: transformedPoint,
