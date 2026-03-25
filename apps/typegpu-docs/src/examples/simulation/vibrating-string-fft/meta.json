@@ -1,0 +1,7 @@
+{
+  "title": "Vibrating String (FFT / DST + Line Audio)",
+  "category": "simulation",
+  "tags": ["ecosystem", "fft", "line-rendering", "audio", "physics"],
+  "dev": true,
+  "coolFactor": 8
+}

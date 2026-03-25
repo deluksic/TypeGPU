@@ -154,7 +154,7 @@ const API_RULES: { id: string; pattern: RegExp }[] = [
   {
     id: 'fft',
     pattern:
-      /createFft2d|createStockhamRadix4LineStrategy|createStockhamRadix2LineStrategy|type\s+Fft2d\b/,
+      /createFft1d|createFft2d|createStockhamRadix4LineStrategy|createStockhamRadix2LineStrategy|type\s+Fft(1|2)d\b/,
   },
   { id: 'wgpu-matrix', pattern: /wgpu-matrix/ },
 ];
