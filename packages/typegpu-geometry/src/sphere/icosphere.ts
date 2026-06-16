@@ -79,8 +79,10 @@ export function icosphere(instanceIndex: number, vertexIndex: number, subdivCoun
   const a = icosahedronFaceVertices.$[faceOffset] as v3f;
   const b = icosahedronFaceVertices.$[faceOffset + 1] as v3f;
   const c = icosahedronFaceVertices.$[faceOffset + 2] as v3f;
+  const vertex = subdivSphericalTriangleSlot.$(a, b, c, vertexIndex, subdivCount);
   return ProceduralSphereResult({
     instanceIndex: objectIndex,
-    vertex: subdivSphericalTriangleSlot.$(a, b, c, vertexIndex, subdivCount),
+    vertex,
+    normal: vertex,
   });
 }

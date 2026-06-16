@@ -1,6 +1,6 @@
-import tgpu from 'typegpu';
-import { arrayOf, u32, type v3f, vec3f } from 'typegpu/data';
+import { u32, type v3f } from 'typegpu/data';
 import { normalize } from 'typegpu/std';
+import { CUBE_FACE_TRIANGLE_COUNT, cubeFaceTriangles } from '../cubeFaceTriangles.ts';
 import {
   subdivTriangle3,
   subdivTriangleIndexCount,
@@ -9,23 +9,7 @@ import {
 import { ProceduralSphereResult } from './result.ts';
 import { spherify } from './spherify.ts';
 
-export const CUBE_FACE_TRIANGLE_COUNT = 12;
-
-const cubeFaceQuads = [
-  [vec3f(1, -1, -1), vec3f(1, -1, 1), vec3f(1, 1, 1), vec3f(1, 1, -1)],
-  [vec3f(-1, -1, 1), vec3f(-1, -1, -1), vec3f(-1, 1, -1), vec3f(-1, 1, 1)],
-  [vec3f(-1, 1, -1), vec3f(1, 1, -1), vec3f(1, 1, 1), vec3f(-1, 1, 1)],
-  [vec3f(-1, -1, 1), vec3f(1, -1, 1), vec3f(1, -1, -1), vec3f(-1, -1, -1)],
-  [vec3f(-1, -1, 1), vec3f(1, -1, 1), vec3f(1, 1, 1), vec3f(-1, 1, 1)],
-  [vec3f(1, -1, -1), vec3f(-1, -1, -1), vec3f(-1, 1, -1), vec3f(1, 1, -1)],
-] as v3f[][];
-
-const cubeFaceTrianglesData = cubeFaceQuads.flatMap(([bl, br, tr, tl]) => [bl, br, tr, bl, tr, tl]) as v3f[];
-
-const cubeFaceTriangles = tgpu.const(
-  arrayOf(vec3f, cubeFaceTrianglesData.length),
-  cubeFaceTrianglesData,
-);
+export { CUBE_FACE_TRIANGLE_COUNT };
 
 export function cubesphereIndexCountPerFace(subdivisions: number) {
   return subdivTriangleIndexCount(subdivisions);
@@ -64,8 +48,10 @@ export function cubesphere(instanceIndex: number, vertexIndex: number, subdivCou
   const b = cubeFaceTriangles.$[cornerOffset + 1] as v3f;
   const c = cubeFaceTriangles.$[cornerOffset + 2] as v3f;
   const onCube = subdivTriangle3(a, b, c, vertexIndex, subdivCount);
+  const vertex = normalize(spherify(onCube));
   return ProceduralSphereResult({
     instanceIndex: objectIndex,
-    vertex: normalize(spherify(onCube)),
+    vertex,
+    normal: vertex,
   });
 }
