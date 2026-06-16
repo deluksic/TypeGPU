@@ -1,6 +1,7 @@
 import {
   cubesphereInstanceCount,
   icosphereInstanceCount,
+  octasphereInstanceCount,
   proceduralSpheres,
   sphereSlot,
   subdivSphericalTriangleSlot,
@@ -83,13 +84,19 @@ let sphere = proceduralSpheres[sphereKind];
 type SphereKind = keyof typeof proceduralSpheres;
 
 function sphereDrawLayout(kind: SphereKind) {
+  const instanceCount =
+    kind === 'icosphere'
+      ? icosphereInstanceCount(sphereCount)
+      : kind === 'octasphere'
+        ? octasphereInstanceCount(sphereCount)
+        : cubesphereInstanceCount(sphereCount);
+
   return {
     indexBuffer,
     wireframeIndexBuffer,
     indexCountPerFace: subdivTriangleIndexCount,
     wireframeIndexCountPerFace: subdivTriangleWireframeIndexCount,
-    instanceCount:
-      kind === 'icosphere' ? icosphereInstanceCount(sphereCount) : cubesphereInstanceCount(sphereCount),
+    instanceCount,
   };
 }
 
@@ -169,7 +176,7 @@ const depthStencil = {
 
 function createPipelines() {
   let pipelineRoot = root.with(sphereSlot, sphere);
-  if (sphereKind === 'icosphere') {
+  if (sphereKind === 'icosphere' || sphereKind === 'octasphere') {
     pipelineRoot = pipelineRoot.with(subdivSphericalTriangleSlot, lift);
   }
 
