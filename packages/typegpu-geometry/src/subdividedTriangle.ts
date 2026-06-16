@@ -1,4 +1,4 @@
-import { f32, u32, type v2f } from 'typegpu/data';
+import { f32, u32, vec3f, type v2f, type v3f } from 'typegpu/data';
 import { sqrt } from 'typegpu/std';
 
 /**
@@ -58,6 +58,17 @@ export function subdivTriangleVertexCount(maxSubdivCount: number) {
   return u32((maxSubdivCount * (maxSubdivCount + 3)) / 2) + 1;
 }
 
+/** Barycentric weights (wA, wB, wC) for a vertex in the subdivided triangle lattice. */
+export function triangleGridBarycentrics(vertexIndex: number, maxSubdivCount: number): v3f {
+  'use gpu';
+  const level = u32((sqrt(8 * f32(vertexIndex) + 1) - 1) / 2);
+  const startIndex = (level * (level + 1)) >> 1;
+  const j = f32(vertexIndex - startIndex);
+  const i = f32(level) - j;
+  const invN = f32(1) / f32(maxSubdivCount);
+  return vec3f(f32(1) - (i + j) * invN, i * invN, j * invN);
+}
+
 export function subdivTriangle(
   A: v2f,
   B: v2f,
@@ -66,12 +77,18 @@ export function subdivTriangle(
   maxSubdivCount: number,
 ): v2f {
   'use gpu';
-  const level = u32((sqrt(8 * f32(vertexIndex) + 1) - 1) / 2);
-  const startIndex = (level * (level + 1)) >> 1;
-  const j = vertexIndex - startIndex;
-  const i = level - j;
-  const wB = f32(i) / f32(maxSubdivCount);
-  const wC = f32(j) / f32(maxSubdivCount);
-  const wA = f32(1) - wB - wC;
-  return A * wA + B * wB + C * wC;
+  const w = triangleGridBarycentrics(vertexIndex, maxSubdivCount);
+  return A * w.x + B * w.y + C * w.z;
+}
+
+export function subdivTriangle3(
+  A: v3f,
+  B: v3f,
+  C: v3f,
+  vertexIndex: number,
+  maxSubdivCount: number,
+): v3f {
+  'use gpu';
+  const w = triangleGridBarycentrics(vertexIndex, maxSubdivCount);
+  return A * w.x + B * w.y + C * w.z;
 }

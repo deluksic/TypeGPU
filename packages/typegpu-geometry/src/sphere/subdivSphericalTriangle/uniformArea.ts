@@ -1,7 +1,7 @@
 import { vec3f, type v3f } from 'typegpu/data';
 import { dot, normalize } from 'typegpu/std';
 import { slerpApproxWarp } from '../../utils.ts';
-import { gridBarycentrics } from './gridBarycentrics.ts';
+import { triangleGridBarycentrics } from '../../subdividedTriangle.ts';
 
 /** Equalize barycentric weights for spherical edges, then normalize onto the sphere. */
 export function uniformArea(
@@ -12,7 +12,7 @@ export function uniformArea(
   maxSubdivCount: number,
 ): v3f {
   'use gpu';
-  const w = gridBarycentrics(vertexIndex, maxSubdivCount);
+  const w = triangleGridBarycentrics(vertexIndex, maxSubdivCount);
   const oppositeDots = vec3f(dot(B, C), dot(A, C), dot(A, B));
   const wUniform = vec3f(
     slerpApproxWarp(oppositeDots.x, w.x),

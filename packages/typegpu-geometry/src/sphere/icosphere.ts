@@ -1,14 +1,14 @@
 import tgpu from 'typegpu';
-import { arrayOf, struct, u32, type v3f, vec3f } from 'typegpu/data';
+import { arrayOf, u32, type v3f, vec3f } from 'typegpu/data';
 import { normalize } from 'typegpu/std';
 import { subdivSphericalTriangleSlot } from './subdivSphericalTriangle/slots.ts';
+import {
+  subdivTriangleIndexCount,
+  subdivTriangleWireframeIndexCount,
+} from '../subdividedTriangle.ts';
+import { ProceduralSphereResult } from './result.ts';
 
 export const ICOSAHEDRON_FACE_COUNT = 20;
-
-export const IcosphereResult = struct({
-  instanceIndex: u32,
-  vertex: vec3f,
-});
 
 const goldenRatio = (1 + Math.sqrt(5)) / 2;
 
@@ -44,7 +44,7 @@ const icosahedronFaceVertices = tgpu.const(
 );
 
 export function icosphereIndexCountPerFace(subdivisions: number) {
-  return subdivisions * subdivisions * 3;
+  return subdivTriangleIndexCount(subdivisions);
 }
 
 export function icosphereIndexCount(subdivisions: number) {
@@ -52,7 +52,7 @@ export function icosphereIndexCount(subdivisions: number) {
 }
 
 export function icosphereWireframeIndexCountPerFace(subdivisions: number) {
-  return subdivisions * subdivisions * 6;
+  return subdivTriangleWireframeIndexCount(subdivisions);
 }
 
 export function icosphereWireframeIndexCount(subdivisions: number) {
@@ -79,7 +79,7 @@ export function icosphere(instanceIndex: number, vertexIndex: number, subdivCoun
   const a = icosahedronFaceVertices.$[faceOffset] as v3f;
   const b = icosahedronFaceVertices.$[faceOffset + 1] as v3f;
   const c = icosahedronFaceVertices.$[faceOffset + 2] as v3f;
-  return IcosphereResult({
+  return ProceduralSphereResult({
     instanceIndex: objectIndex,
     vertex: subdivSphericalTriangleSlot.$(a, b, c, vertexIndex, subdivCount),
   });

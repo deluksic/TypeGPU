@@ -1,12 +1,15 @@
 import {
-  icosphereIndexCountPerFace,
+  cubesphereInstanceCount,
   icosphereInstanceCount,
-  icosphere,
-  icosphereWireframeIndexCountPerFace,
+  proceduralSpheres,
+  sphereSlot,
   subdivSphericalTriangleSlot,
   subdivSphericalTriangles,
+  subdivTriangleIndices,
+  subdivTriangleIndexCount,
+  subdivTriangleWireframeIndices,
+  subdivTriangleWireframeIndexCount,
 } from '@typegpu/geometry';
-import { subdivTriangleIndices, subdivTriangleWireframeIndices } from '@typegpu/geometry';
 import tgpu, { d, std as s } from 'typegpu';
 import { Camera, setupOrbitCamera } from '../../common/setup-orbit-camera.ts';
 import { defineControls } from '../../common/defineControls.ts';
@@ -17,7 +20,7 @@ const context = root.configureContext({ canvas, alphaMode: 'premultiplied' });
 const presentationFormat = navigator.gpu.getPreferredCanvasFormat();
 const multisample = false;
 
-const MAX_ICOSPHERE_SUBDIV = 10;
+const MAX_SPHERE_SUBDIV = 10;
 
 const Uniforms = d.struct({
   subdivCount: d.u32,
@@ -42,15 +45,15 @@ const bindGroupLayout = tgpu.bindGroupLayout({
 
 const indexBuffer = root
   .createBuffer(
-    d.arrayOf(d.u32, subdivTriangleIndices(MAX_ICOSPHERE_SUBDIV).length),
-    subdivTriangleIndices(MAX_ICOSPHERE_SUBDIV),
+    d.arrayOf(d.u32, subdivTriangleIndices(MAX_SPHERE_SUBDIV).length),
+    subdivTriangleIndices(MAX_SPHERE_SUBDIV),
   )
   .$usage('index');
 
 const wireframeIndexBuffer = root
   .createBuffer(
-    d.arrayOf(d.u32, subdivTriangleWireframeIndices(MAX_ICOSPHERE_SUBDIV).length),
-    subdivTriangleWireframeIndices(MAX_ICOSPHERE_SUBDIV),
+    d.arrayOf(d.u32, subdivTriangleWireframeIndices(MAX_SPHERE_SUBDIV).length),
+    subdivTriangleWireframeIndices(MAX_SPHERE_SUBDIV),
   )
   .$usage('index');
 
@@ -74,6 +77,23 @@ const spheres = root
 
 let subdivLevel = 4;
 let lift = subdivSphericalTriangles.uniformArea;
+let sphereKind: keyof typeof proceduralSpheres = 'icosphere';
+let sphere = proceduralSpheres[sphereKind];
+
+type SphereKind = keyof typeof proceduralSpheres;
+
+function sphereDrawLayout(kind: SphereKind) {
+  return {
+    indexBuffer,
+    wireframeIndexBuffer,
+    indexCountPerFace: subdivTriangleIndexCount,
+    wireframeIndexCountPerFace: subdivTriangleWireframeIndexCount,
+    instanceCount:
+      kind === 'icosphere' ? icosphereInstanceCount(sphereCount) : cubesphereInstanceCount(sphereCount),
+  };
+}
+
+let drawLayout = sphereDrawLayout(sphereKind);
 
 const uniforms = root.createBuffer(Uniforms, { subdivCount: subdivLevel }).$usage('uniform');
 const camera = root.createBuffer(Camera).$usage('uniform');
@@ -108,14 +128,14 @@ const mainVertex = tgpu.vertexFn({
 })(({ vertexIndex, instanceIndex }) => {
   'use gpu';
   const subdivCount = bindGroupLayout.$.uniforms.subdivCount;
-  const ico = icosphere(instanceIndex, vertexIndex, subdivCount);
-  const sphere = bindGroupLayout.$.spheres[ico.instanceIndex];
-  const worldPos = sphere.position + ico.vertex * sphere.radius;
+  const patch = sphereSlot.$(instanceIndex, vertexIndex, subdivCount);
+  const sphereData = bindGroupLayout.$.spheres[patch.instanceIndex];
+  const worldPos = sphereData.position + patch.vertex * sphereData.radius;
   const cameraUniform = bindGroupLayout.$.camera;
   return {
     outPos: cameraUniform.projection * cameraUniform.view * d.vec4f(worldPos, 1),
-    worldNormal: ico.vertex,
-    sphereIndex: ico.instanceIndex,
+    worldNormal: patch.vertex,
+    sphereIndex: patch.instanceIndex,
   };
 });
 
@@ -148,7 +168,10 @@ const depthStencil = {
 };
 
 function createPipelines() {
-  const pipelineRoot = root.with(subdivSphericalTriangleSlot, lift);
+  let pipelineRoot = root.with(sphereSlot, sphere);
+  if (sphereKind === 'icosphere') {
+    pipelineRoot = pipelineRoot.with(subdivSphericalTriangleSlot, lift);
+  }
 
   const fillPipeline = pipelineRoot
     .createRenderPipeline({
@@ -167,7 +190,7 @@ function createPipelines() {
       },
       multisample: { count: multisample ? 4 : 1 },
     })
-    .withIndexBuffer(indexBuffer);
+    .withIndexBuffer(drawLayout.indexBuffer);
 
   const wireframePipeline = pipelineRoot
     .createRenderPipeline({
@@ -184,7 +207,7 @@ function createPipelines() {
       },
       multisample: { count: multisample ? 4 : 1 },
     })
-    .withIndexBuffer(wireframeIndexBuffer);
+    .withIndexBuffer(drawLayout.wireframeIndexBuffer);
 
   return { fillPipeline, wireframePipeline };
 }
@@ -228,8 +251,6 @@ createRenderTargets();
 const resizeObserver = new ResizeObserver(createRenderTargets);
 resizeObserver.observe(canvas);
 
-const instanceCount = icosphereInstanceCount(sphereCount);
-
 function colorAttachment(clear: boolean) {
   return {
     ...(multisample
@@ -254,7 +275,7 @@ function draw() {
       depthLoadOp: 'clear',
       depthStoreOp: 'store',
     })
-    .drawIndexed(icosphereIndexCountPerFace(subdivLevel), instanceCount);
+    .drawIndexed(drawLayout.indexCountPerFace(subdivLevel), drawLayout.instanceCount);
 
   wireframePipeline
     .with(bindGroup)
@@ -264,7 +285,7 @@ function draw() {
       depthLoadOp: 'load',
       depthStoreOp: 'store',
     })
-    .drawIndexed(icosphereWireframeIndexCountPerFace(subdivLevel), instanceCount);
+    .drawIndexed(drawLayout.wireframeIndexCountPerFace(subdivLevel), drawLayout.instanceCount);
 }
 
 let destroyed = false;
@@ -280,10 +301,20 @@ requestAnimationFrame(frame);
 // #region Example controls & Cleanup
 
 export const controls = defineControls({
+  Sphere: {
+    initial: sphereKind,
+    options: Object.keys(proceduralSpheres),
+    onSelectChange: (selected) => {
+      sphereKind = selected as SphereKind;
+      sphere = proceduralSpheres[sphereKind];
+      drawLayout = sphereDrawLayout(sphereKind);
+      ({ fillPipeline, wireframePipeline } = createPipelines());
+    },
+  },
   Subdivisions: {
     initial: subdivLevel,
     min: 1,
-    max: MAX_ICOSPHERE_SUBDIV,
+    max: MAX_SPHERE_SUBDIV,
     step: 1,
     onSliderChange: (newValue) => {
       subdivLevel = newValue;
