@@ -1,6 +1,6 @@
 import tgpu from 'typegpu';
-import { bool, f32, struct, vec2f } from 'typegpu/data';
-import { dot, mix, normalize, select } from 'typegpu/std';
+import { bool, f32, struct, vec2f, vec3f } from 'typegpu/data';
+import { dot, mix, normalize, select, sqrt } from 'typegpu/std';
 
 /** Rotates a 2D vector counter-clockwise by 90 degrees */
 export const rot90ccw = tgpu.fn(
@@ -84,21 +84,36 @@ export const midPoint = tgpu.fn(
   return (a + b) * 0.5;
 });
 
+/** Warps a linear edge parameter so `mix(a, b, warp(d, t))` ≈ SLERP; `d = dot(a, b)`. */
+export const slerpApproxWarp = tgpu.fn(
+  [f32, f32],
+  f32,
+)((d, t) => {
+  'use gpu';
+  const cosHalfAngle = sqrt(0.5 * (1.0 + d));
+  const B = (2.0 - 2.0 * cosHalfAngle) / (2.0 + cosHalfAngle);
+  const C1 = (1.0 - B) * 0.5;
+  const u = t + t - 1.0;
+  const u2 = u * u;
+  return (u * C1) / (1.0 - B * u2) + 0.5;
+});
+
+/** Approximate SLERP for unit vec2f by warping the lerp parameter (Padé approximant). */
 export const slerpApprox = tgpu.fn(
   [vec2f, vec2f, f32],
   vec2f,
 )((a, b, t) => {
   'use gpu';
-  const mid = bisectNoCheck(a, b);
-  let a_ = vec2f(a);
-  let b_ = vec2f(mid);
-  let t_ = 2 * t;
-  if (t > 0.5) {
-    a_ = vec2f(mid);
-    b_ = vec2f(b);
-    t_ -= 1;
-  }
-  return normalize(mix(a_, b_, t_));
+  return normalize(mix(a, b, slerpApproxWarp(dot(a, b), t)));
+});
+
+/** Approximate SLERP for unit vec3f by warping the lerp parameter (Padé approximant). */
+export const slerpApprox3 = tgpu.fn(
+  [vec3f, vec3f, f32],
+  vec3f,
+)((a, b, t) => {
+  'use gpu';
+  return normalize(mix(a, b, slerpApproxWarp(dot(a, b), t)));
 });
 
 const Intersection = struct({
