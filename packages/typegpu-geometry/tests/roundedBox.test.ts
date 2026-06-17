@@ -4,36 +4,38 @@ import {
   roundedBoxIndexCount,
   roundedBoxIndexCountPerPatch,
   roundedBoxInstanceCount,
+  roundedBoxObjectIndex,
+  roundedBoxPatchIndex,
   roundedBoxWireframeIndexCount,
   roundedBoxWireframeIndexCountPerPatch,
 } from '../src/box/roundedBox.ts';
 import {
-  subdivTriangleIndices,
-  subdivTriangleIndexCount,
-  subdivTriangleWireframeIndexCount,
-} from '../src/subdividedTriangle.ts';
+  segmentTriangleIndices,
+  segmentTriangleIndexCount,
+  segmentTriangleWireframeIndexCount,
+} from '../src/segmentedTriangle.ts';
 
-const MAX_ROUNDED_BOX_SUBDIV = 10;
+const MAX_ROUNDED_BOX_SEGMENT_COUNT = 10;
 
 describe('roundedBoxIndexCount', () => {
-  it('returns subdivisions² × 3 indices per patch', () => {
-    expect(roundedBoxIndexCountPerPatch(4)).toBe(subdivTriangleIndexCount(4));
+  it('returns segmentCount² × 3 indices per patch', () => {
+    expect(roundedBoxIndexCountPerPatch(4)).toBe(segmentTriangleIndexCount(4));
     expect(roundedBoxIndexCountPerPatch(4)).toBe(48);
   });
 
-  it('returns 44 × subdivisions² × 3 total indices', () => {
+  it('returns 44 × segmentCount² × 3 total indices', () => {
     expect(roundedBoxIndexCount(4)).toBe(2112);
     expect(roundedBoxIndexCount(10)).toBe(13200);
   });
 });
 
 describe('roundedBoxWireframeIndexCount', () => {
-  it('returns subdivisions² × 6 indices per patch', () => {
-    expect(roundedBoxWireframeIndexCountPerPatch(4)).toBe(subdivTriangleWireframeIndexCount(4));
+  it('returns segmentCount² × 6 indices per patch', () => {
+    expect(roundedBoxWireframeIndexCountPerPatch(4)).toBe(segmentTriangleWireframeIndexCount(4));
     expect(roundedBoxWireframeIndexCountPerPatch(4)).toBe(96);
   });
 
-  it('returns 44 × subdivisions² × 6 total indices', () => {
+  it('returns 44 × segmentCount² × 6 total indices', () => {
     expect(roundedBoxWireframeIndexCount(4)).toBe(4224);
   });
 });
@@ -46,12 +48,12 @@ describe('roundedBoxInstanceCount', () => {
 });
 
 describe('roundedBox instancing layout', () => {
-  it('uses subdivTriangleIndices as a per-patch prefix at max subdiv', () => {
-    const maxIndices = subdivTriangleIndices(MAX_ROUNDED_BOX_SUBDIV);
+  it('uses segmentTriangleIndices as a per-patch prefix at max segment count', () => {
+    const maxIndices = segmentTriangleIndices(MAX_ROUNDED_BOX_SEGMENT_COUNT);
 
-    for (let subdivisions = 1; subdivisions <= MAX_ROUNDED_BOX_SUBDIV; subdivisions++) {
-      expect(maxIndices.slice(0, roundedBoxIndexCountPerPatch(subdivisions))).toEqual(
-        subdivTriangleIndices(subdivisions),
+    for (let segmentCount = 1; segmentCount <= MAX_ROUNDED_BOX_SEGMENT_COUNT; segmentCount++) {
+      expect(maxIndices.slice(0, roundedBoxIndexCountPerPatch(segmentCount))).toEqual(
+        segmentTriangleIndices(segmentCount),
       );
     }
   });
@@ -61,8 +63,9 @@ describe('roundedBox instancing layout', () => {
     const instanceCount = roundedBoxInstanceCount(objectCount);
 
     for (let drawInstanceIndex = 0; drawInstanceIndex < instanceCount; drawInstanceIndex += 137) {
-      const objectIndex = Math.floor(drawInstanceIndex / ROUNDED_BOX_PATCH_COUNT);
-      expect(drawInstanceIndex % ROUNDED_BOX_PATCH_COUNT).toBeLessThan(ROUNDED_BOX_PATCH_COUNT);
+      const objectIndex = roundedBoxObjectIndex(drawInstanceIndex);
+      const patchIndex = roundedBoxPatchIndex(drawInstanceIndex);
+      expect(patchIndex).toBeLessThan(ROUNDED_BOX_PATCH_COUNT);
       expect(objectIndex).toBeLessThan(objectCount);
     }
   });

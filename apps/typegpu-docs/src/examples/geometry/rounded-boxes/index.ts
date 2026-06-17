@@ -2,12 +2,13 @@ import {
   roundedBox,
   ROUNDED_BOX_CORNER_COUNT,
   ROUNDED_BOX_EDGE_PATCH_OFFSET,
-  ROUNDED_BOX_PATCH_COUNT,
   roundedBoxInstanceCount,
   roundedBoxIndexCountPerPatch,
+  roundedBoxObjectIndex,
+  roundedBoxPatchIndex,
   roundedBoxWireframeIndexCountPerPatch,
-  subdivTriangleIndices,
-  subdivTriangleWireframeIndices,
+  segmentTriangleIndices,
+  segmentTriangleWireframeIndices,
 } from '@typegpu/geometry';
 import tgpu, { d, std as s } from 'typegpu';
 import { Camera, setupOrbitCamera } from '../../common/setup-orbit-camera.ts';
@@ -19,10 +20,10 @@ const context = root.configureContext({ canvas, alphaMode: 'premultiplied' });
 const presentationFormat = navigator.gpu.getPreferredCanvasFormat();
 const multisample = true;
 
-const MAX_SUBDIV = 16;
+const MAX_SEGMENT_COUNT = 16;
 
 const Uniforms = d.struct({
-  subdivCount: d.u32,
+  segmentCount: d.u32,
 });
 
 const RoundedBox = d.struct({
@@ -45,15 +46,15 @@ const bindGroupLayout = tgpu.bindGroupLayout({
 
 const indexBuffer = root
   .createBuffer(
-    d.arrayOf(d.u32, subdivTriangleIndices(MAX_SUBDIV).length),
-    subdivTriangleIndices(MAX_SUBDIV),
+    d.arrayOf(d.u32, segmentTriangleIndices(MAX_SEGMENT_COUNT).length),
+    segmentTriangleIndices(MAX_SEGMENT_COUNT),
   )
   .$usage('index');
 
 const wireframeIndexBuffer = root
   .createBuffer(
-    d.arrayOf(d.u32, subdivTriangleWireframeIndices(MAX_SUBDIV).length),
-    subdivTriangleWireframeIndices(MAX_SUBDIV),
+    d.arrayOf(d.u32, segmentTriangleWireframeIndices(MAX_SEGMENT_COUNT).length),
+    segmentTriangleWireframeIndices(MAX_SEGMENT_COUNT),
   )
   .$usage('index');
 
@@ -75,11 +76,12 @@ const boxes = root
   )
   .$usage('storage');
 
-let subdivLevel = 4;
+let segmentCount = 4;
+let wireframe = true;
 
 const instanceCount = roundedBoxInstanceCount(boxCount);
 
-const uniforms = root.createBuffer(Uniforms, { subdivCount: subdivLevel }).$usage('uniform');
+const uniforms = root.createBuffer(Uniforms, { segmentCount: segmentCount }).$usage('uniform');
 const camera = root.createBuffer(Camera).$usage('uniform');
 
 const bindGroup = root.createBindGroup(bindGroupLayout, {
@@ -111,14 +113,14 @@ const mainVertex = tgpu.vertexFn({
   },
 })(({ vertexIndex, instanceIndex }) => {
   'use gpu';
-  const subdivCount = bindGroupLayout.$.uniforms.subdivCount;
-  const objectIndex = d.u32(instanceIndex / ROUNDED_BOX_PATCH_COUNT);
+  const segmentCount = bindGroupLayout.$.uniforms.segmentCount;
+  const objectIndex = roundedBoxObjectIndex(instanceIndex);
   const boxData = bindGroupLayout.$.boxes[objectIndex];
-  const patchIndex = d.u32(instanceIndex % ROUNDED_BOX_PATCH_COUNT);
+  const patchIndex = roundedBoxPatchIndex(instanceIndex);
   const patch = roundedBox(
     instanceIndex,
     vertexIndex,
-    subdivCount,
+    segmentCount,
     boxData.halfSize,
     boxData.cornerRadius,
   );
@@ -287,17 +289,19 @@ function draw() {
       depthLoadOp: 'clear',
       depthStoreOp: 'store',
     })
-    .drawIndexed(roundedBoxIndexCountPerPatch(subdivLevel), instanceCount);
+    .drawIndexed(roundedBoxIndexCountPerPatch(segmentCount), instanceCount);
 
-  wireframePipeline
-    .with(bindGroup)
-    .withColorAttachment(colorAttachment(false))
-    .withDepthStencilAttachment({
-      view: depthTextureView,
-      depthLoadOp: 'load',
-      depthStoreOp: 'store',
-    })
-    .drawIndexed(roundedBoxWireframeIndexCountPerPatch(subdivLevel), instanceCount);
+  if (wireframe) {
+    wireframePipeline
+      .with(bindGroup)
+      .withColorAttachment(colorAttachment(false))
+      .withDepthStencilAttachment({
+        view: depthTextureView,
+        depthLoadOp: 'load',
+        depthStoreOp: 'store',
+      })
+      .drawIndexed(roundedBoxWireframeIndexCountPerPatch(segmentCount), instanceCount);
+  }
 }
 
 let destroyed = false;
@@ -313,14 +317,14 @@ requestAnimationFrame(frame);
 // #region Example controls & Cleanup
 
 export const controls = defineControls({
-  Subdivisions: {
-    initial: subdivLevel,
+  Segments: {
+    initial: segmentCount,
     min: 1,
-    max: MAX_SUBDIV,
+    max: MAX_SEGMENT_COUNT,
     step: 1,
     onSliderChange: (newValue) => {
-      subdivLevel = newValue;
-      uniforms.write({ subdivCount: subdivLevel });
+      segmentCount = newValue;
+      uniforms.write({ segmentCount: segmentCount });
     },
   },
   'Border radius': {
@@ -337,6 +341,12 @@ export const controls = defineControls({
           cornerRadius,
         }),
       ]);
+    },
+  },
+  Wireframe: {
+    initial: wireframe,
+    onToggleChange: (value) => {
+      wireframe = value;
     },
   },
 });

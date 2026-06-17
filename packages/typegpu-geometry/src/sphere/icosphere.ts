@@ -1,14 +1,21 @@
 import tgpu from 'typegpu';
-import { arrayOf, u32, type v3f, vec3f } from 'typegpu/data';
+import { arrayOf, type v3f, vec3f } from 'typegpu/data';
 import { normalize } from 'typegpu/std';
-import { subdivSphericalTriangleSlot } from './subdivSphericalTriangle/slots.ts';
-import {
-  subdivTriangleIndexCount,
-  subdivTriangleWireframeIndexCount,
-} from '../subdividedTriangle.ts';
-import { ProceduralSphereResult } from './result.ts';
+import { segmentSphericalTriangleSlot } from './segmentSphericalTriangle/slots.ts';
+import { makePatchInstancingHelpers } from '../internal/patchCountHelpers.ts';
+import { ProceduralShapeResult } from '../shape/result.ts';
 
 export const ICOSAHEDRON_FACE_COUNT = 20;
+
+const instancing = makePatchInstancingHelpers(ICOSAHEDRON_FACE_COUNT);
+
+export const icosphereIndexCountPerFace = instancing.indexCountPerPatch;
+export const icosphereIndexCount = instancing.indexCount;
+export const icosphereWireframeIndexCountPerFace = instancing.wireframeIndexCountPerPatch;
+export const icosphereWireframeIndexCount = instancing.wireframeIndexCount;
+export const icosphereInstanceCount = instancing.instanceCount;
+export const icosphereObjectIndex = instancing.objectIndex;
+export const icospherePatchIndex = instancing.patchIndex;
 
 const goldenRatio = (1 + Math.sqrt(5)) / 2;
 
@@ -43,45 +50,23 @@ const icosahedronFaceVertices = tgpu.const(
   icosahedronFaceVerticesData,
 );
 
-export function icosphereIndexCountPerFace(subdivisions: number) {
-  return subdivTriangleIndexCount(subdivisions);
-}
-
-export function icosphereIndexCount(subdivisions: number) {
-  return ICOSAHEDRON_FACE_COUNT * icosphereIndexCountPerFace(subdivisions);
-}
-
-export function icosphereWireframeIndexCountPerFace(subdivisions: number) {
-  return subdivTriangleWireframeIndexCount(subdivisions);
-}
-
-export function icosphereWireframeIndexCount(subdivisions: number) {
-  return ICOSAHEDRON_FACE_COUNT * icosphereWireframeIndexCountPerFace(subdivisions);
-}
-
-export function icosphereInstanceCount(objectCount: number) {
-  return objectCount * ICOSAHEDRON_FACE_COUNT;
-}
-
 /**
  * Vertex shader helper for procedural icospheres.
  *
  * Setup: one instance per icosahedron face (`icosphereInstanceCount(n)`), shared
- * `subdivTriangleIndices(maxSubdiv)` index buffer, draw a prefix via `icosphereIndexCountPerFace(subdivCount)`.
- * Pass `@builtin(instance_index)` / `@builtin(vertex_index)`; `subdivCount` must match the draw count.
+ * `segmentTriangleIndices(maxSegmentCount)` index buffer, draw a prefix via `icosphereIndexCountPerFace(segmentCount)`.
+ * Pass `@builtin(instance_index)` / `@builtin(vertex_index)`; `segmentCount` must match the draw count.
  * Scale `vertex` by radius and offset by object center for world position.
  */
-export function icosphere(instanceIndex: number, vertexIndex: number, subdivCount: number) {
+export function icosphere(instanceIndex: number, vertexIndex: number, segmentCount: number) {
   'use gpu';
-  const objectIndex = u32(instanceIndex / ICOSAHEDRON_FACE_COUNT);
-  const faceIndex = u32(instanceIndex % ICOSAHEDRON_FACE_COUNT);
+  const faceIndex = icospherePatchIndex(instanceIndex);
   const faceOffset = faceIndex * 3;
   const a = icosahedronFaceVertices.$[faceOffset] as v3f;
   const b = icosahedronFaceVertices.$[faceOffset + 1] as v3f;
   const c = icosahedronFaceVertices.$[faceOffset + 2] as v3f;
-  const vertex = subdivSphericalTriangleSlot.$(a, b, c, vertexIndex, subdivCount);
-  return ProceduralSphereResult({
-    instanceIndex: objectIndex,
+  const vertex = segmentSphericalTriangleSlot.$(a, b, c, vertexIndex, segmentCount);
+  return ProceduralShapeResult({
     vertex,
     normal: vertex,
   });

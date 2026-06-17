@@ -1,6 +1,6 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
-exports[`subdivTriangleIndices > snapshot test for subdiv level 25 1`] = `
+exports[`segmentTriangleIndices > snapshot test for segment count 25 1`] = `
 [
   0,
   1,

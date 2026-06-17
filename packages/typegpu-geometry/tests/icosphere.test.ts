@@ -4,36 +4,38 @@ import {
   icosphereIndexCount,
   icosphereIndexCountPerFace,
   icosphereInstanceCount,
+  icosphereObjectIndex,
+  icospherePatchIndex,
   icosphereWireframeIndexCount,
   icosphereWireframeIndexCountPerFace,
 } from '../src/sphere/icosphere.ts';
 import {
-  subdivTriangleIndices,
-  subdivTriangleIndexCount,
-  subdivTriangleWireframeIndexCount,
-} from '../src/subdividedTriangle.ts';
+  segmentTriangleIndices,
+  segmentTriangleIndexCount,
+  segmentTriangleWireframeIndexCount,
+} from '../src/segmentedTriangle.ts';
 
-const MAX_ICOSPHERE_SUBDIV = 10;
+const MAX_ICOSPHERE_SEGMENT_COUNT = 10;
 
 describe('icosphereIndexCount', () => {
-  it('returns subdivisions² × 3 indices per face', () => {
-    expect(icosphereIndexCountPerFace(4)).toBe(subdivTriangleIndexCount(4));
+  it('returns segmentCount² × 3 indices per face', () => {
+    expect(icosphereIndexCountPerFace(4)).toBe(segmentTriangleIndexCount(4));
     expect(icosphereIndexCountPerFace(4)).toBe(48);
   });
 
-  it('returns 20 × subdivisions² × 3 total indices', () => {
+  it('returns 20 × segmentCount² × 3 total indices', () => {
     expect(icosphereIndexCount(4)).toBe(960);
     expect(icosphereIndexCount(10)).toBe(6000);
   });
 });
 
 describe('icosphereWireframeIndexCount', () => {
-  it('returns subdivisions² × 6 indices per face', () => {
-    expect(icosphereWireframeIndexCountPerFace(4)).toBe(subdivTriangleWireframeIndexCount(4));
+  it('returns segmentCount² × 6 indices per face', () => {
+    expect(icosphereWireframeIndexCountPerFace(4)).toBe(segmentTriangleWireframeIndexCount(4));
     expect(icosphereWireframeIndexCountPerFace(4)).toBe(96);
   });
 
-  it('returns 20 × subdivisions² × 6 total indices', () => {
+  it('returns 20 × segmentCount² × 6 total indices', () => {
     expect(icosphereWireframeIndexCount(4)).toBe(1920);
   });
 });
@@ -46,12 +48,12 @@ describe('icosphereInstanceCount', () => {
 });
 
 describe('icosphere instancing layout', () => {
-  it('uses subdivTriangleIndices as a per-face prefix at max subdiv', () => {
-    const maxIndices = subdivTriangleIndices(MAX_ICOSPHERE_SUBDIV);
+  it('uses segmentTriangleIndices as a per-face prefix at max segment count', () => {
+    const maxIndices = segmentTriangleIndices(MAX_ICOSPHERE_SEGMENT_COUNT);
 
-    for (let subdivisions = 1; subdivisions <= MAX_ICOSPHERE_SUBDIV; subdivisions++) {
-      expect(maxIndices.slice(0, icosphereIndexCountPerFace(subdivisions))).toEqual(
-        subdivTriangleIndices(subdivisions),
+    for (let segmentCount = 1; segmentCount <= MAX_ICOSPHERE_SEGMENT_COUNT; segmentCount++) {
+      expect(maxIndices.slice(0, icosphereIndexCountPerFace(segmentCount))).toEqual(
+        segmentTriangleIndices(segmentCount),
       );
     }
   });
@@ -61,8 +63,9 @@ describe('icosphere instancing layout', () => {
     const instanceCount = icosphereInstanceCount(objectCount);
 
     for (let drawInstanceIndex = 0; drawInstanceIndex < instanceCount; drawInstanceIndex += 137) {
-      const objectIndex = Math.floor(drawInstanceIndex / ICOSAHEDRON_FACE_COUNT);
-      expect(drawInstanceIndex % ICOSAHEDRON_FACE_COUNT).toBeLessThan(ICOSAHEDRON_FACE_COUNT);
+      const objectIndex = icosphereObjectIndex(drawInstanceIndex);
+      const patchIndex = icospherePatchIndex(drawInstanceIndex);
+      expect(patchIndex).toBeLessThan(ICOSAHEDRON_FACE_COUNT);
       expect(objectIndex).toBeLessThan(objectCount);
     }
   });

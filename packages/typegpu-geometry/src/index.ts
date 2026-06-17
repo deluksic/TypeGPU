@@ -5,4 +5,4 @@ export * from './cubeFaceTriangles.ts';
 export * from './lines/index.ts';
 export * from './shape/result.ts';
 export * from './sphere/index.ts';
-export * from './subdividedTriangle.ts';
+export * from './segmentedTriangle.ts';

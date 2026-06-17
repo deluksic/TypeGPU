@@ -4,36 +4,38 @@ import {
   capsuleIndexCount,
   capsuleIndexCountPerPatch,
   capsuleInstanceCount,
+  capsuleObjectIndex,
+  capsulePatchIndex,
   capsuleWireframeIndexCount,
   capsuleWireframeIndexCountPerPatch,
 } from '../src/capsule/capsule.ts';
 import {
-  subdivTriangleIndices,
-  subdivTriangleIndexCount,
-  subdivTriangleWireframeIndexCount,
-} from '../src/subdividedTriangle.ts';
+  segmentTriangleIndices,
+  segmentTriangleIndexCount,
+  segmentTriangleWireframeIndexCount,
+} from '../src/segmentedTriangle.ts';
 
-const MAX_CAPSULE_SUBDIV = 10;
+const MAX_CAPSULE_SEGMENT_COUNT = 10;
 
 describe('capsuleIndexCount', () => {
-  it('returns subdivisions² × 3 indices per patch', () => {
-    expect(capsuleIndexCountPerPatch(4)).toBe(subdivTriangleIndexCount(4));
+  it('returns segmentCount² × 3 indices per patch', () => {
+    expect(capsuleIndexCountPerPatch(4)).toBe(segmentTriangleIndexCount(4));
     expect(capsuleIndexCountPerPatch(4)).toBe(48);
   });
 
-  it('returns 16 × subdivisions² × 3 total indices', () => {
+  it('returns 16 × segmentCount² × 3 total indices', () => {
     expect(capsuleIndexCount(4)).toBe(768);
     expect(capsuleIndexCount(10)).toBe(4800);
   });
 });
 
 describe('capsuleWireframeIndexCount', () => {
-  it('returns subdivisions² × 6 indices per patch', () => {
-    expect(capsuleWireframeIndexCountPerPatch(4)).toBe(subdivTriangleWireframeIndexCount(4));
+  it('returns segmentCount² × 6 indices per patch', () => {
+    expect(capsuleWireframeIndexCountPerPatch(4)).toBe(segmentTriangleWireframeIndexCount(4));
     expect(capsuleWireframeIndexCountPerPatch(4)).toBe(96);
   });
 
-  it('returns 16 × subdivisions² × 6 total indices', () => {
+  it('returns 16 × segmentCount² × 6 total indices', () => {
     expect(capsuleWireframeIndexCount(4)).toBe(1536);
   });
 });
@@ -46,12 +48,12 @@ describe('capsuleInstanceCount', () => {
 });
 
 describe('capsule instancing layout', () => {
-  it('uses subdivTriangleIndices as a per-patch prefix at max subdiv', () => {
-    const maxIndices = subdivTriangleIndices(MAX_CAPSULE_SUBDIV);
+  it('uses segmentTriangleIndices as a per-patch prefix at max segment count', () => {
+    const maxIndices = segmentTriangleIndices(MAX_CAPSULE_SEGMENT_COUNT);
 
-    for (let subdivisions = 1; subdivisions <= MAX_CAPSULE_SUBDIV; subdivisions++) {
-      expect(maxIndices.slice(0, capsuleIndexCountPerPatch(subdivisions))).toEqual(
-        subdivTriangleIndices(subdivisions),
+    for (let segmentCount = 1; segmentCount <= MAX_CAPSULE_SEGMENT_COUNT; segmentCount++) {
+      expect(maxIndices.slice(0, capsuleIndexCountPerPatch(segmentCount))).toEqual(
+        segmentTriangleIndices(segmentCount),
       );
     }
   });
@@ -61,8 +63,9 @@ describe('capsule instancing layout', () => {
     const instanceCount = capsuleInstanceCount(objectCount);
 
     for (let drawInstanceIndex = 0; drawInstanceIndex < instanceCount; drawInstanceIndex += 137) {
-      const objectIndex = Math.floor(drawInstanceIndex / CAPSULE_PATCH_COUNT);
-      expect(drawInstanceIndex % CAPSULE_PATCH_COUNT).toBeLessThan(CAPSULE_PATCH_COUNT);
+      const objectIndex = capsuleObjectIndex(drawInstanceIndex);
+      const patchIndex = capsulePatchIndex(drawInstanceIndex);
+      expect(patchIndex).toBeLessThan(CAPSULE_PATCH_COUNT);
       expect(objectIndex).toBeLessThan(objectCount);
     }
   });

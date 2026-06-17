@@ -4,36 +4,38 @@ import {
   cubesphereIndexCount,
   cubesphereIndexCountPerFace,
   cubesphereInstanceCount,
+  cubesphereObjectIndex,
+  cubespherePatchIndex,
   cubesphereWireframeIndexCount,
   cubesphereWireframeIndexCountPerFace,
 } from '../src/sphere/cubesphere.ts';
 import {
-  subdivTriangleIndices,
-  subdivTriangleIndexCount,
-  subdivTriangleWireframeIndexCount,
-} from '../src/subdividedTriangle.ts';
+  segmentTriangleIndices,
+  segmentTriangleIndexCount,
+  segmentTriangleWireframeIndexCount,
+} from '../src/segmentedTriangle.ts';
 
-const MAX_CUBESPHERE_SUBDIV = 10;
+const MAX_CUBESPHERE_SEGMENT_COUNT = 10;
 
 describe('cubesphereIndexCount', () => {
-  it('returns subdivisions² × 3 indices per face triangle', () => {
-    expect(cubesphereIndexCountPerFace(4)).toBe(subdivTriangleIndexCount(4));
+  it('returns segmentCount² × 3 indices per face triangle', () => {
+    expect(cubesphereIndexCountPerFace(4)).toBe(segmentTriangleIndexCount(4));
     expect(cubesphereIndexCountPerFace(4)).toBe(48);
   });
 
-  it('returns 12 × subdivisions² × 3 total indices', () => {
+  it('returns 12 × segmentCount² × 3 total indices', () => {
     expect(cubesphereIndexCount(4)).toBe(576);
     expect(cubesphereIndexCount(10)).toBe(3600);
   });
 });
 
 describe('cubesphereWireframeIndexCount', () => {
-  it('returns subdivisions² × 6 indices per face triangle', () => {
-    expect(cubesphereWireframeIndexCountPerFace(4)).toBe(subdivTriangleWireframeIndexCount(4));
+  it('returns segmentCount² × 6 indices per face triangle', () => {
+    expect(cubesphereWireframeIndexCountPerFace(4)).toBe(segmentTriangleWireframeIndexCount(4));
     expect(cubesphereWireframeIndexCountPerFace(4)).toBe(96);
   });
 
-  it('returns 12 × subdivisions² × 6 total indices', () => {
+  it('returns 12 × segmentCount² × 6 total indices', () => {
     expect(cubesphereWireframeIndexCount(4)).toBe(1152);
   });
 });
@@ -46,12 +48,12 @@ describe('cubesphereInstanceCount', () => {
 });
 
 describe('cubesphere instancing layout', () => {
-  it('uses subdivTriangleIndices as a per-face prefix at max subdiv', () => {
-    const maxIndices = subdivTriangleIndices(MAX_CUBESPHERE_SUBDIV);
+  it('uses segmentTriangleIndices as a per-face prefix at max segment count', () => {
+    const maxIndices = segmentTriangleIndices(MAX_CUBESPHERE_SEGMENT_COUNT);
 
-    for (let subdivisions = 1; subdivisions <= MAX_CUBESPHERE_SUBDIV; subdivisions++) {
-      expect(maxIndices.slice(0, cubesphereIndexCountPerFace(subdivisions))).toEqual(
-        subdivTriangleIndices(subdivisions),
+    for (let segmentCount = 1; segmentCount <= MAX_CUBESPHERE_SEGMENT_COUNT; segmentCount++) {
+      expect(maxIndices.slice(0, cubesphereIndexCountPerFace(segmentCount))).toEqual(
+        segmentTriangleIndices(segmentCount),
       );
     }
   });
@@ -61,8 +63,9 @@ describe('cubesphere instancing layout', () => {
     const instanceCount = cubesphereInstanceCount(objectCount);
 
     for (let drawInstanceIndex = 0; drawInstanceIndex < instanceCount; drawInstanceIndex += 137) {
-      const objectIndex = Math.floor(drawInstanceIndex / CUBE_FACE_TRIANGLE_COUNT);
-      expect(drawInstanceIndex % CUBE_FACE_TRIANGLE_COUNT).toBeLessThan(CUBE_FACE_TRIANGLE_COUNT);
+      const objectIndex = cubesphereObjectIndex(drawInstanceIndex);
+      const patchIndex = cubespherePatchIndex(drawInstanceIndex);
+      expect(patchIndex).toBeLessThan(CUBE_FACE_TRIANGLE_COUNT);
       expect(objectIndex).toBeLessThan(objectCount);
     }
   });

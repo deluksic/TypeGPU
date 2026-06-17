@@ -1,7 +1,7 @@
 import {
-  subdivTriangle,
-  subdivTriangleIndices,
-  subdivTriangleWireframeIndices,
+  segmentTriangle,
+  segmentTriangleIndices,
+  segmentTriangleWireframeIndices,
 } from '@typegpu/geometry';
 import tgpu, { d, std as s } from 'typegpu';
 import { defineControls } from '../../common/defineControls.ts';
@@ -53,10 +53,10 @@ createDepthAndMsaaTextures();
 const resizeObserver = new ResizeObserver(createDepthAndMsaaTextures);
 resizeObserver.observe(canvas);
 
-const MAX_SUBDIV_LEVEL = 10;
+const MAX_SEGMENT_COUNT = 10;
 
 const Uniforms = d.struct({
-  maxSubdivCount: d.u32,
+  maxSegmentCount: d.u32,
 });
 
 const Triangle = d.struct({
@@ -74,11 +74,11 @@ const bindGroupLayout = tgpu.bindGroupLayout({
   },
 });
 
-const maxSubdivIndices = subdivTriangleIndices(MAX_SUBDIV_LEVEL);
-const maxWireframeIndices = subdivTriangleWireframeIndices(MAX_SUBDIV_LEVEL);
+const maxSegmentIndices = segmentTriangleIndices(MAX_SEGMENT_COUNT);
+const maxWireframeIndices = segmentTriangleWireframeIndices(MAX_SEGMENT_COUNT);
 
 const indexBuffer = root
-  .createBuffer(d.arrayOf(d.u32, maxSubdivIndices.length), maxSubdivIndices)
+  .createBuffer(d.arrayOf(d.u32, maxSegmentIndices.length), maxSegmentIndices)
   .$usage('index');
 
 const wireframeIndexBuffer = root
@@ -109,9 +109,9 @@ const triangles = root
   )
   .$usage('storage');
 
-let subdivLevel = 8;
+let segmentCount = 8;
 
-const uniforms = root.createBuffer(Uniforms, { maxSubdivCount: subdivLevel }).$usage('uniform');
+const uniforms = root.createBuffer(Uniforms, { maxSegmentCount: segmentCount }).$usage('uniform');
 
 const uniformsBindGroup = root.createBindGroup(bindGroupLayout, {
   uniforms,
@@ -129,9 +129,9 @@ const mainVertex = tgpu.vertexFn({
   },
 })(({ vertexIndex, instanceIndex }) => {
   'use gpu';
-  const maxSubdivCount = bindGroupLayout.$.uniforms.maxSubdivCount;
+  const maxSegmentCount = bindGroupLayout.$.uniforms.maxSegmentCount;
   const T = bindGroupLayout.$.triangles[instanceIndex];
-  const pos = subdivTriangle(T.a, T.b, T.c, vertexIndex, maxSubdivCount);
+  const pos = segmentTriangle(T.a, T.b, T.c, vertexIndex, maxSegmentCount);
   return {
     outPos: d.vec4f(pos, 0.0, 1.0),
     instanceIndex,
@@ -177,11 +177,11 @@ const wireframePipeline = root
   })
   .withIndexBuffer(wireframeIndexBuffer);
 
-function indexCountForSubdivLevel(level: number) {
+function indexCountForSegmentCount(level: number) {
   return level * level * 3;
 }
 
-function wireframeIndexCountForSubdivLevel(level: number) {
+function wireframeIndexCountForSegmentCount(level: number) {
   return level * level * 6;
 }
 
@@ -206,12 +206,12 @@ function draw() {
     .withPerformanceCallback((a, b) => {
       console.log((Number(b - a) * 1e-6).toFixed(3), 'ms');
     })
-    .drawIndexed(indexCountForSubdivLevel(subdivLevel), triangleCount);
+    .drawIndexed(indexCountForSegmentCount(segmentCount), triangleCount);
 
   wireframePipeline
     .with(uniformsBindGroup)
     .withColorAttachment(colorAttachment(false))
-    .drawIndexed(wireframeIndexCountForSubdivLevel(subdivLevel), triangleCount);
+    .drawIndexed(wireframeIndexCountForSegmentCount(segmentCount), triangleCount);
 }
 
 setTimeout(draw, 100);
@@ -219,14 +219,14 @@ setTimeout(draw, 100);
 // #region Example controls & Cleanup
 
 export const controls = defineControls({
-  Subdivisions: {
-    initial: subdivLevel,
+  Segments: {
+    initial: segmentCount,
     min: 1,
-    max: MAX_SUBDIV_LEVEL,
+    max: MAX_SEGMENT_COUNT,
     step: 1,
     onSliderChange: (newValue) => {
-      subdivLevel = newValue;
-      uniforms.write({ maxSubdivCount: subdivLevel });
+      segmentCount = newValue;
+      uniforms.write({ maxSegmentCount: segmentCount });
       draw();
     },
   },

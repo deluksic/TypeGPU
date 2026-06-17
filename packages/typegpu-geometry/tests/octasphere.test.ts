@@ -4,36 +4,38 @@ import {
   octasphereIndexCount,
   octasphereIndexCountPerFace,
   octasphereInstanceCount,
+  octasphereObjectIndex,
+  octaspherePatchIndex,
   octasphereWireframeIndexCount,
   octasphereWireframeIndexCountPerFace,
 } from '../src/sphere/octasphere.ts';
 import {
-  subdivTriangleIndices,
-  subdivTriangleIndexCount,
-  subdivTriangleWireframeIndexCount,
-} from '../src/subdividedTriangle.ts';
+  segmentTriangleIndices,
+  segmentTriangleIndexCount,
+  segmentTriangleWireframeIndexCount,
+} from '../src/segmentedTriangle.ts';
 
-const MAX_OCTASPHERE_SUBDIV = 10;
+const MAX_OCTASPHERE_SEGMENT_COUNT = 10;
 
 describe('octasphereIndexCount', () => {
-  it('returns subdivisions² × 3 indices per face', () => {
-    expect(octasphereIndexCountPerFace(4)).toBe(subdivTriangleIndexCount(4));
+  it('returns segmentCount² × 3 indices per face', () => {
+    expect(octasphereIndexCountPerFace(4)).toBe(segmentTriangleIndexCount(4));
     expect(octasphereIndexCountPerFace(4)).toBe(48);
   });
 
-  it('returns 8 × subdivisions² × 3 total indices', () => {
+  it('returns 8 × segmentCount² × 3 total indices', () => {
     expect(octasphereIndexCount(4)).toBe(384);
     expect(octasphereIndexCount(10)).toBe(2400);
   });
 });
 
 describe('octasphereWireframeIndexCount', () => {
-  it('returns subdivisions² × 6 indices per face', () => {
-    expect(octasphereWireframeIndexCountPerFace(4)).toBe(subdivTriangleWireframeIndexCount(4));
+  it('returns segmentCount² × 6 indices per face', () => {
+    expect(octasphereWireframeIndexCountPerFace(4)).toBe(segmentTriangleWireframeIndexCount(4));
     expect(octasphereWireframeIndexCountPerFace(4)).toBe(96);
   });
 
-  it('returns 8 × subdivisions² × 6 total indices', () => {
+  it('returns 8 × segmentCount² × 6 total indices', () => {
     expect(octasphereWireframeIndexCount(4)).toBe(768);
   });
 });
@@ -46,12 +48,12 @@ describe('octasphereInstanceCount', () => {
 });
 
 describe('octasphere instancing layout', () => {
-  it('uses subdivTriangleIndices as a per-face prefix at max subdiv', () => {
-    const maxIndices = subdivTriangleIndices(MAX_OCTASPHERE_SUBDIV);
+  it('uses segmentTriangleIndices as a per-face prefix at max segment count', () => {
+    const maxIndices = segmentTriangleIndices(MAX_OCTASPHERE_SEGMENT_COUNT);
 
-    for (let subdivisions = 1; subdivisions <= MAX_OCTASPHERE_SUBDIV; subdivisions++) {
-      expect(maxIndices.slice(0, octasphereIndexCountPerFace(subdivisions))).toEqual(
-        subdivTriangleIndices(subdivisions),
+    for (let segmentCount = 1; segmentCount <= MAX_OCTASPHERE_SEGMENT_COUNT; segmentCount++) {
+      expect(maxIndices.slice(0, octasphereIndexCountPerFace(segmentCount))).toEqual(
+        segmentTriangleIndices(segmentCount),
       );
     }
   });
@@ -61,8 +63,9 @@ describe('octasphere instancing layout', () => {
     const instanceCount = octasphereInstanceCount(objectCount);
 
     for (let drawInstanceIndex = 0; drawInstanceIndex < instanceCount; drawInstanceIndex += 137) {
-      const objectIndex = Math.floor(drawInstanceIndex / OCTAHEDRON_FACE_COUNT);
-      expect(drawInstanceIndex % OCTAHEDRON_FACE_COUNT).toBeLessThan(OCTAHEDRON_FACE_COUNT);
+      const objectIndex = octasphereObjectIndex(drawInstanceIndex);
+      const patchIndex = octaspherePatchIndex(drawInstanceIndex);
+      expect(patchIndex).toBeLessThan(OCTAHEDRON_FACE_COUNT);
       expect(objectIndex).toBeLessThan(objectCount);
     }
   });
